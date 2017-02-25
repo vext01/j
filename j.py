@@ -6,6 +6,7 @@ import os
 import datetime
 import tempfile
 import time
+import argparse
 
 # XXX change default
 JRNL_DIR = os.environ.get("J_JOURNAL_PATH", os.path.abspath("j"))
@@ -108,7 +109,7 @@ class Journal:
         os.close(fd)
         self._invoke_editor(path)
 
-    def show(self, bodies=False, tag_filters=None, textual_filters=None):
+    def show_entries(self, bodies=True, tag_filters=None, textual_filters=None):
         itr = os.scandir(self.directory)
         files = sorted(filter(lambda x: x.is_file(), itr), key=lambda x: x.name)
 
@@ -138,8 +139,8 @@ class Journal:
         for e in entries:
             print(str(e))
 
-    def show_single(self, ident, body=False):
-        print(Entry(os.path.join(self.directory, ident)))
+    def show_single_entry(self, ident, body=False):
+        print(Entry(os.path.join(self.directory, ident), meta_only=not body))
 
     def edit_entry(self, ident):
         path = os.path.join(self.directory, ident)
@@ -159,20 +160,43 @@ if __name__ == "__main__":
     logging.root.setLevel(logging.DEBUG)
     jrnl = Journal(JRNL_DIR)
 
-    # XXX better interface, allow multiple terms
-    if len(sys.argv) == 1:  # no args
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers()
+
+    new_parser = subparsers.add_parser('new')
+    new_parser.set_defaults(mode='new')
+
+    edit_parser = subparsers.add_parser('edit')
+    edit_parser.set_defaults(mode='edit')
+    edit_parser.add_argument("id", help="id of entry to edit")
+
+    show_parser = subparsers.add_parser('show')
+    show_parser.set_defaults(mode='show')
+    show_parser.add_argument("arg", nargs="*", help="an id to show or @tags to filter by")
+    show_parser.add_argument("--short", "-s", action="store_true", help="omit bodies")
+    show_parser.add_argument("--term", "-t", nargs="*", help="Filter by search terms")
+
+    args = parser.parse_args()
+    try:
+        mode = args.mode
+    except AttributeError:
+        mode = "show"
+        parser.print_help()
+        sys.exit(1)
+
+    if mode == "new":
         jrnl.new_entry()
-    else:
-        if sys.argv[1] == "ls":
-            jrnl.show()
-        elif sys.argv[1] == "show":
-            jrnl.show(bodies=True)
-        elif sys.argv[1] == "edit":
-            jrnl.edit_entry(sys.argv[2])
-        elif sys.argv[1].startswith("@"):
-            jrnl.show(bodies=True, tag_filters=[sys.argv[1][1:]])
-        elif sys.argv[1].startswith("-"):
-            jrnl.show(bodies=True, textual_filters=[sys.argv[1][1:]])
+    elif mode == "show":
+        if len(args.arg) == 1 and not args.arg[0].startswith("@"):
+            # XXX -t makes no sense it this case
+            jrnl.show_single_entry(args.arg[0], body=not args.short)
         else:
-            # assume it's an ID
-            jrnl.show_single(sys.argv[1])
+            # XXX check all tags start with @
+            tag_filters = [x[1:] for x in args.arg]
+            jrnl.show_entries(tag_filters=tag_filters,
+                              textual_filters=args.term,
+                              bodies=not args.short)
+    elif mode == "edit":
+        jrnl.edit_entry(args.id)
+    else:
+        assert(False)  # unreachable

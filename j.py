@@ -84,6 +84,9 @@ class Entry:
             rec += "\n\n%s" % self.body
         return rec
 
+    def matches_tag(self, tag):
+        return tag in self.tags
+
 
 class Journal:
     def __init__(self, directory):
@@ -107,14 +110,29 @@ class Journal:
             print("parsing failed: %s" % e)
             sys.exit(1)
 
-    def show(self, bodies=False):
+    def show(self, bodies=False, tag_filters=None):
         itr = os.scandir(self.directory)
         files = sorted(filter(lambda x: x.is_file(), itr), key=lambda x: x.name)
 
-        if len(files):
-            for fl in files:
-                print("%s" % Entry(
-                    os.path.join(self.directory, fl.name), meta_only=not bodies))
+        entries = []
+        for fl in files:
+                entries.append(Entry(os.path.join(self.directory, fl.name),
+                                     meta_only=not bodies))
+
+        # Apply tag filters
+        if tag_filters:
+            filtered_entries = set([])
+            for tag in tag_filters:
+                filtered_entries |= set(
+                    filter(lambda x: x.matches_tag(tag), entries)
+                )
+            entries = filtered_entries
+
+        for e in entries:
+            print(str(e))
+
+    def show_single(self, ident, body=False):
+        print(Entry(os.path.join(self.directory, ident)))
 
 if __name__ == "__main__":
     logging.root.setLevel(logging.DEBUG)
@@ -127,4 +145,8 @@ if __name__ == "__main__":
             jrnl.show()
         elif sys.argv[1] == "show":
             jrnl.show(bodies=True)
-
+        elif sys.argv[1].startswith("@"):
+            jrnl.show(bodies=True, tag_filters=[sys.argv[1][1:]])
+        else:
+            # assume it's an ID
+            jrnl.show_single(sys.argv[1])

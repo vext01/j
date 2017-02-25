@@ -106,13 +106,7 @@ class Journal:
         prefix = now.strftime("%s-" % TIME_FORMAT)
         fd, path = tempfile.mkstemp(dir=self.directory, prefix=prefix)
         os.close(fd)
-        os.system("%s %s" % (EDITOR, path))
-        try:
-            Entry(path)  # just check it parses
-        except ParseError as e:
-            # XXX try again
-            print("parsing failed: %s" % e)
-            sys.exit(1)
+        self._invoke_editor(path)
 
     def show(self, bodies=False, tag_filters=None, textual_filters=None):
         itr = os.scandir(self.directory)
@@ -147,13 +141,17 @@ class Journal:
     def show_single(self, ident, body=False):
         print(Entry(os.path.join(self.directory, ident)))
 
-    def edit(self, ident):
+    def edit_entry(self, ident):
         path = os.path.join(self.directory, ident)
+        self._invoke_editor(path)
+
+    def _invoke_editor(self, path):
         os.system("%s %s" % (EDITOR, path))
         try:
             Entry(path)  # just check it parses
         except ParseError as e:
             # XXX try again
+            # Offer to delete if not and this is a new entry?
             print("parsing failed: %s" % e)
             sys.exit(1)
 
@@ -170,7 +168,7 @@ if __name__ == "__main__":
         elif sys.argv[1] == "show":
             jrnl.show(bodies=True)
         elif sys.argv[1] == "edit":
-            jrnl.edit(sys.argv[2])
+            jrnl.edit_entry(sys.argv[2])
         elif sys.argv[1].startswith("@"):
             jrnl.show(bodies=True, tag_filters=[sys.argv[1][1:]])
         elif sys.argv[1].startswith("-"):

@@ -87,6 +87,10 @@ class Entry:
     def matches_tag(self, tag):
         return tag in self.tags
 
+    def matches_term(self, term):
+        with open(self.path) as fh:
+            return term in fh.read()
+
 
 class Journal:
     def __init__(self, directory):
@@ -110,7 +114,7 @@ class Journal:
             print("parsing failed: %s" % e)
             sys.exit(1)
 
-    def show(self, bodies=False, tag_filters=None):
+    def show(self, bodies=False, tag_filters=None, textual_filters=None):
         itr = os.scandir(self.directory)
         files = sorted(filter(lambda x: x.is_file(), itr), key=lambda x: x.name)
 
@@ -128,6 +132,15 @@ class Journal:
                 )
             entries = filtered_entries
 
+        # Apply textual filters
+        if textual_filters:
+            filtered_entries = set([])
+            for term in textual_filters:
+                filtered_entries |= set(
+                    filter(lambda x: x.matches_term(term), entries)
+                )
+            entries = filtered_entries
+
         for e in entries:
             print(str(e))
 
@@ -138,6 +151,7 @@ if __name__ == "__main__":
     logging.root.setLevel(logging.DEBUG)
     jrnl = Journal(JRNL_DIR)
 
+    # XXX better interface, allow multiple terms
     if len(sys.argv) == 1:  # no args
         jrnl.new_entry()
     else:
@@ -147,6 +161,8 @@ if __name__ == "__main__":
             jrnl.show(bodies=True)
         elif sys.argv[1].startswith("@"):
             jrnl.show(bodies=True, tag_filters=[sys.argv[1][1:]])
+        elif sys.argv[1].startswith("-"):
+            jrnl.show(bodies=True, textual_filters=[sys.argv[1][1:]])
         else:
             # assume it's an ID
             jrnl.show_single(sys.argv[1])

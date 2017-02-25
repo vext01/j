@@ -163,14 +163,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
 
-    new_parser = subparsers.add_parser('new')
+    new_parser = subparsers.add_parser('new', aliases=['n'])
     new_parser.set_defaults(mode='new')
 
-    edit_parser = subparsers.add_parser('edit')
+    edit_parser = subparsers.add_parser('edit', aliases=['e'])
     edit_parser.set_defaults(mode='edit')
     edit_parser.add_argument("id", help="id of entry to edit")
 
-    show_parser = subparsers.add_parser('show')
+    show_parser = subparsers.add_parser('show', aliases=['s'])
     show_parser.set_defaults(mode='show')
     show_parser.add_argument("arg", nargs="*", help="an id to show or @tags to filter by")
     show_parser.add_argument("--short", "-s", action="store_true", help="omit bodies")

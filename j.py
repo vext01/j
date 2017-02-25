@@ -147,6 +147,16 @@ class Journal:
     def show_single(self, ident, body=False):
         print(Entry(os.path.join(self.directory, ident)))
 
+    def edit(self, ident):
+        path = os.path.join(self.directory, ident)
+        os.system("%s %s" % (EDITOR, path))
+        try:
+            Entry(path)  # just check it parses
+        except ParseError as e:
+            # XXX try again
+            print("parsing failed: %s" % e)
+            sys.exit(1)
+
 if __name__ == "__main__":
     logging.root.setLevel(logging.DEBUG)
     jrnl = Journal(JRNL_DIR)
@@ -159,6 +169,8 @@ if __name__ == "__main__":
             jrnl.show()
         elif sys.argv[1] == "show":
             jrnl.show(bodies=True)
+        elif sys.argv[1] == "edit":
+            jrnl.edit(sys.argv[2])
         elif sys.argv[1].startswith("@"):
             jrnl.show(bodies=True, tag_filters=[sys.argv[1][1:]])
         elif sys.argv[1].startswith("-"):

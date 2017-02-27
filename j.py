@@ -113,7 +113,7 @@ class Journal:
         os.close(fd)
         self._invoke_editor(path)
 
-    def show_entries(self, bodies=True, tag_filters=None, textual_filters=None):
+    def _collect_entries(self, bodies=True):
         itr = os.scandir(self.directory)
         files = sorted(filter(lambda x: x.is_file(), itr), key=lambda x: x.name)
 
@@ -121,6 +121,10 @@ class Journal:
         for fl in files:
                 entries.append(Entry(os.path.join(self.directory, fl.name),
                                      meta_only=not bodies))
+        return entries
+
+    def show_entries(self, bodies=True, tag_filters=None, textual_filters=None):
+        entries = self._collect_entries(bodies=bodies)
 
         # Apply tag filters
         if tag_filters:
@@ -150,6 +154,13 @@ class Journal:
         path = os.path.join(self.directory, ident)
         self._invoke_editor(path)
 
+    def edit_tag(self, tag):
+        # XXX if there are lots of matches, how does the user exit?
+        entries = self._collect_entries(bodies=False)
+        files = [x.path for x in entries if x.matches_tag(tag)]
+        for f in files:
+            self._invoke_editor(f)
+
     def _invoke_editor(self, path):
         os.system("%s %s" % (EDITOR, path))
         try:
@@ -172,7 +183,7 @@ if __name__ == "__main__":
 
     edit_parser = subparsers.add_parser('edit', aliases=['e'])
     edit_parser.set_defaults(mode='edit')
-    edit_parser.add_argument("id", help="id of entry to edit")
+    edit_parser.add_argument("arg", nargs="*", help="entry id or tag to edit")
 
     show_parser = subparsers.add_parser('show', aliases=['s'])
     show_parser.set_defaults(mode='show')
@@ -201,6 +212,14 @@ if __name__ == "__main__":
                               textual_filters=args.term,
                               bodies=not args.short)
     elif mode == "edit":
-        jrnl.edit_entry(args.id)
+        if len(args.arg) != 1:
+            edit_parser.print_help()
+            sys.exit(1)
+
+        if args.arg[0].startswith("@"):
+            jrnl.edit_tag(args.arg[0][1:])
+        else:
+            jrnl.edit_entry(args.arg[0])
+
     else:
         assert(False)  # unreachable

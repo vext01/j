@@ -8,8 +8,12 @@ import tempfile
 import time
 import argparse
 
-# XXX change default
-JRNL_DIR = os.environ.get("J_JOURNAL_PATH", os.path.abspath("j"))
+try:
+    JRNL_DIR = os.environ["J_JOURNAL_DIR"]
+except KeyError:
+    print("Please set J_JOURNAL_DIR")
+    sys.exit(1)
+
 EDITOR = os.environ.get("EDITOR", "vi")
 TIME_FORMAT = "%Y%m%d_%H%M%S"
 

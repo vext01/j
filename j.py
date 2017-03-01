@@ -197,7 +197,7 @@ if __name__ == "__main__":
     show_parser.set_defaults(mode='show')
     show_parser.add_argument("arg", nargs="*", help="an id to show or @tags to filter by")
     show_parser.add_argument("--short", "-s", action="store_true", help="omit bodies")
-    show_parser.add_argument("--term", "-t", nargs="*", help="Filter by search terms")
+    show_parser.add_argument("--term", "-t", nargs="*", default=None, help="Filter by search terms")
 
     args = parser.parse_args()
     try:
@@ -217,6 +217,7 @@ if __name__ == "__main__":
         else:
             # XXX check all tags start with @
             filters.tag_filters = [x[1:] for x in args.arg]
+            filters.textual_filters = args.term
             jrnl.show_entries(bodies=not args.short, filters=filters)
     elif mode == "edit":
         if len(args.arg) != 1:

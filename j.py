@@ -14,6 +14,8 @@ except KeyError:
     print("Please set J_JOURNAL_DIR")
     sys.exit(1)
 
+DEFAULT_DATE_FILTER = os.environ.get("J_JOURNAL_DEFAULT_DATE_FILTER")
+
 EDITOR = os.environ.get("EDITOR", "vi")
 TIME_FORMAT = "%Y%m%d_%H%M%S"
 
@@ -179,6 +181,39 @@ class Journal:
             print("parsing failed: %s" % e)
             sys.exit(1)
 
+
+class DateFilterException(Exception):
+    pass
+
+
+class DateFilter:
+    def __init__(self, start=None, stop=None):
+        self.start = start
+        self.stop = stop
+
+    def matches(self, date):
+        return True # XXX
+
+
+def parse_date_filter_elem(elem):
+    # XXX
+    return None
+
+
+def parse_date_filter_arg(arg):
+    elems = arg.split(":")
+    num_elems = len(elems)
+    if not (1 <= num_elems <= 2):
+        raise DateFilterException()
+
+    start = parse_date_filter_elem(elems[0])
+    if num_elems == 2:
+        stop = parse_date_filter_elem(elems[1])
+    else:
+        stop = None
+    return DateFilter(start, stop)
+
+
 if __name__ == "__main__":
     logging.root.setLevel(logging.DEBUG)
     jrnl = Journal(JRNL_DIR)
@@ -198,6 +233,7 @@ if __name__ == "__main__":
     show_parser.add_argument("arg", nargs="*", help="an id to show or @tags to filter by")
     show_parser.add_argument("--short", "-s", action="store_true", help="omit bodies")
     show_parser.add_argument("--term", "-t", nargs="*", default=None, help="Filter by search terms")
+    show_parser.add_argument("--when", "-w", default=DEFAULT_DATE_FILTER, help="Filter by date")
 
     args = parser.parse_args()
     try:
@@ -210,14 +246,26 @@ if __name__ == "__main__":
     if mode == "new":
         jrnl.new_entry()
     elif mode == "show":
-        filters = FilterSettings()
         if len(args.arg) == 1 and not args.arg[0].startswith("@"):
             # XXX -t makes no sense it this case
+            # XXX -w makes no sense it this case
             jrnl.show_single_entry(args.arg[0], body=not args.short)
         else:
             # XXX check all tags start with @
+            filters = FilterSettings()
+            if args.when:
+                try:
+                    date_filter = parse_date_filter_arg(args.when)
+                except DateFilterException:
+                    print("invalid date filter")
+                    sys.exit(1)
+            else:
+                date_filter = DateFilter()
+
             filters.tag_filters = [x[1:] for x in args.arg]
             filters.textual_filters = args.term
+            filters.date_filter = date_filter
+
             jrnl.show_entries(bodies=not args.short, filters=filters)
     elif mode == "edit":
         if len(args.arg) != 1:

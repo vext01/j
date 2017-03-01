@@ -20,6 +20,13 @@ TIME_FORMAT = "%Y%m%d_%H%M%S"
 RULE_SIZE = 78
 DOUBLE_RULE = "=" * RULE_SIZE
 
+
+class FilterSettings:
+    def __init__(self, tag_filters=None, textual_filters=None):
+        self.tag_filters = tag_filters
+        self.textual_filters = textual_filters
+
+
 class ParseError(Exception):
     pass
 
@@ -113,37 +120,37 @@ class Journal:
         os.close(fd)
         self._invoke_editor(path)
 
-    def _collect_entries(self, bodies=True):
+    def _collect_entries(self, filters, bodies=True):
         itr = os.scandir(self.directory)
-        files = sorted(filter(lambda x: x.is_file(), itr), key=lambda x: x.name)
+        files = filter(lambda x: x.is_file(), itr)
 
         entries = []
         for fl in files:
-                entries.append(Entry(os.path.join(self.directory, fl.name),
-                                     meta_only=not bodies))
-        return entries
+                add = True
+                entry = Entry(os.path.join(self.directory, fl.name),
+                              meta_only=not bodies)
 
-    def show_entries(self, bodies=True, tag_filters=None, textual_filters=None):
-        entries = self._collect_entries(bodies=bodies)
+                # Only add if *all* tag filters match
+                if filters.tag_filters:
+                    matches = [entry.matches_tag(t) for t in filters.tag_filters]
+                    if not all(matches):
+                        continue
 
-        # Apply tag filters
-        if tag_filters:
-            filtered_entries = set([])
-            for tag in tag_filters:
-                filtered_entries |= set(
-                    filter(lambda x: x.matches_tag(tag), entries)
-                )
-            entries = filtered_entries
+                # Only add if *all* textual filters match
+                if filters.textual_filters:
+                    matches = [entry.matches_term(t) for t in filters.textual_filters]
+                    if not all(matches):
+                        continue
 
-        # Apply textual filters
-        if textual_filters:
-            filtered_entries = set([])
-            for term in textual_filters:
-                filtered_entries |= set(
-                    filter(lambda x: x.matches_term(term), entries)
-                )
-            entries = filtered_entries
+                # Passed all filters
+                entries.append(entry)
+        return sorted(entries, key=lambda e: e.date)
 
+    def show_entries(self, filters=None, bodies=True):
+        if not filters:
+            filters = FilterSettings()
+
+        entries = self._collect_entries(bodies=bodies, filters=filters)
         for e in entries:
             print(str(e))
 
@@ -156,10 +163,11 @@ class Journal:
 
     def edit_tag(self, tag):
         # XXX if there are lots of matches, how does the user exit?
-        entries = self._collect_entries(bodies=False)
-        files = [x.path for x in entries if x.matches_tag(tag)]
-        for f in files:
-            self._invoke_editor(f)
+        # XXX edit tag with timeframe?
+        filters = FilterSettings(tag_filters=[tag])
+        entries = self._collect_entries(filters, bodies=False)
+        for entry in entries:
+            self._invoke_editor(entry.path)
 
     def _invoke_editor(self, path):
         os.system("%s %s" % (EDITOR, path))
@@ -202,15 +210,14 @@ if __name__ == "__main__":
     if mode == "new":
         jrnl.new_entry()
     elif mode == "show":
+        filters = FilterSettings()
         if len(args.arg) == 1 and not args.arg[0].startswith("@"):
             # XXX -t makes no sense it this case
             jrnl.show_single_entry(args.arg[0], body=not args.short)
         else:
             # XXX check all tags start with @
-            tag_filters = [x[1:] for x in args.arg]
-            jrnl.show_entries(tag_filters=tag_filters,
-                              textual_filters=args.term,
-                              bodies=not args.short)
+            filters.tag_filters = [x[1:] for x in args.arg]
+            jrnl.show_entries(bodies=not args.short, filters=filters)
     elif mode == "edit":
         if len(args.arg) != 1:
             edit_parser.print_help()

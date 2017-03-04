@@ -29,6 +29,95 @@ class FilterSettings:
         self.textual_filters = textual_filters
 
 
+class TimeFilterException(Exception):
+    pass
+
+
+class TimeFilter:
+    # The various absolute time formats j supports
+    ABS_TIME_FMTS = [
+        "%Y",
+        "%Y-%m",
+        "%Y-%m-%d",
+        "%Y-%m-%d %H",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d %H:%M:%S",
+    ]
+
+    def __init__(self, start=None, stop=None):
+        self.start = start
+        self.stop = stop
+
+    @classmethod
+    def from_arg(cls, arg):
+        elems = arg.split(":")
+        num_elems = len(elems)
+        if not (1 <= num_elems <= 2):
+            raise TimeFilterException()
+
+        start = cls._parse_time_filter_elem(elems[0])
+        if num_elems == 2:
+            stop = cls._parse_time_filter_elem(elems[1])
+        else:
+            stop = None
+
+        if stop and start > stop:
+            raise TimeFilterException()
+        return cls(start, stop)
+
+    @staticmethod
+    def _parse_time_filter_elem(elem):
+        if len(elem) > 1 and elem[-1] in ("d", "w", "m", "y", "h", "M"):
+            # relative to now
+            try:
+                num = int(elem[:-1])
+            except ValueError:
+                raise TimeFilterException()
+
+            unit = elem[-1]
+
+            if unit == "M":
+                delta = timedelta(minutes=num)
+            elif unit == "h":
+                delta = timedelta(hours=num)
+            elif unit == "d":
+                delta = timedelta(days=num)
+            elif unit == "w":
+                delta = timedelta(days=num * 7)
+            elif unit == "m":
+                delta = timedelta(days=num * 31)  # roughly
+            elif unit == "y":
+                delta = timedelta(days=num * 365)  # roughly
+            else:
+                assert False  # unreachable
+
+            return datetime.now() - delta
+        else:
+            for fmt in TimeFilter.ABS_TIME_FMTS:
+                try:
+                    return datetime.strptime(elem, fmt)
+                except ValueError:
+                    continue
+            else:
+                raise TimeFilterException()
+
+    def matches(self, entry):
+        if not self.start:
+            assert not self.stop
+            # filter matches anything
+            return True
+
+        if not self.stop:
+            stop = datetime.now()
+        else:
+            stop = self.stop
+
+        if self.start <= entry.time <= stop:
+            return True
+        else:
+            return False
+
+
 class ParseError(Exception):
     pass
 
@@ -36,7 +125,7 @@ class Entry:
     def __init__(self, path, meta_only=False):
         self.path = path
         self.title = None
-        self.date = None
+        self.time = None
         self.body = None
         self.tags = set()
         self.parse(meta_only)
@@ -47,7 +136,7 @@ class Entry:
     def parse(self, meta_only=False):
         # Get the time from the file path first
         tstr = os.path.basename(self.path).split("-")[0]
-        self.date = datetime.strptime(tstr, TIME_FORMAT)
+        self.time = datetime.strptime(tstr, TIME_FORMAT)
 
         with open(self.path) as fh:
             lines = iter(fh.readlines())
@@ -83,11 +172,11 @@ class Entry:
                 raise ParseError("unexpected end of file")
 
     def __str__(self):
-        date_str = str(self.date)
-        pad = " " * (RULE_SIZE - len(date_str) - len(self.ident()))
+        time_str = str(self.time)
+        pad = " " * (RULE_SIZE - len(time_str) - len(self.ident()))
         headers = [
             DOUBLE_RULE,
-            "%s%s%s" % (date_str, pad, self.ident()),
+            "%s%s%s" % (time_str, pad, self.ident()),
             self.title.center(RULE_SIZE),
         ]
         if self.tags:
@@ -133,8 +222,8 @@ class Journal:
                               meta_only=not bodies)
 
                 # Only add if the time filter matches
-                if filters.date_filter:
-                    if not filters.date_filter.matches(entry):
+                if filters.time_filter:
+                    if not filters.time_filter.matches(entry):
                         continue
 
                 # Only add if *all* tag filters match
@@ -151,7 +240,7 @@ class Journal:
 
                 # Passed all filters
                 entries.append(entry)
-        return sorted(entries, key=lambda e: e.date)
+        return sorted(entries, key=lambda e: e.time)
 
     def show_entries(self, filters=None, bodies=True):
         if not filters:
@@ -187,95 +276,6 @@ class Journal:
             sys.exit(1)
 
 
-class DateFilterException(Exception):
-    pass
-
-
-class DateFilter:
-    # The various absolute time formats j supports
-    ABS_TIME_FMTS = [
-        "%Y",
-        "%Y-%m",
-        "%Y-%m-%d",
-        "%Y-%m-%d %H",
-        "%Y-%m-%d %H:%M",
-        "%Y-%m-%d %H:%M:%S",
-    ]
-
-    def __init__(self, start=None, stop=None):
-        self.start = start
-        self.stop = stop
-
-    def matches(self, entry):
-        if not self.start:
-            assert not self.stop
-            # filter matches anything
-            return True
-
-        if not self.stop:
-            stop = datetime.now()
-        else:
-            stop = self.stop
-
-        if self.start <= entry.date <= stop:
-            return True
-        else:
-            return False
-
-
-def parse_date_filter_elem(elem):
-    if len(elem) > 1 and elem[-1] in ("d", "w", "m", "y", "h", "M"):
-        # relative to now
-        try:
-            num = int(elem[:-1])
-        except ValueError:
-            raise DateFilterException()
-
-        unit = elem[-1]
-
-        if unit == "M":
-            delta = timedelta(minutes=num)
-        elif unit == "h":
-            delta = timedelta(hours=num)
-        elif unit == "d":
-            delta = timedelta(days=num)
-        elif unit == "w":
-            delta = timedelta(days=num * 7)
-        elif unit == "m":
-            delta = timedelta(days=num * 31)  # roughly
-        elif unit == "y":
-            delta = timedelta(days=num * 365)  # roughly
-        else:
-            assert False  # unreachable
-
-        return datetime.now() - delta
-    else:
-        for fmt in DateFilter.ABS_TIME_FMTS:
-            try:
-                return datetime.strptime(elem, fmt) 
-            except ValueError:
-                continue
-        else:
-            raise DateFilterException()
-
-
-def parse_date_filter_arg(arg):
-    elems = arg.split(":")
-    num_elems = len(elems)
-    if not (1 <= num_elems <= 2):
-        raise DateFilterException()
-
-    start = parse_date_filter_elem(elems[0])
-    if num_elems == 2:
-        stop = parse_date_filter_elem(elems[1])
-    else:
-        stop = None
-
-    if stop and start > stop:
-        raise DateFilterException()
-    return DateFilter(start, stop)
-
-
 if __name__ == "__main__":
     logging.root.setLevel(logging.DEBUG)
     jrnl = Journal(JRNL_DIR)
@@ -295,7 +295,8 @@ if __name__ == "__main__":
     show_parser.add_argument("arg", nargs="*", help="an id to show or @tags to filter by")
     show_parser.add_argument("--short", "-s", action="store_true", help="omit bodies")
     show_parser.add_argument("--term", "-t", nargs="*", default=None, help="Filter by search terms")
-    show_parser.add_argument("--when", "-w", default=DEFAULT_DATE_FILTER, help="Filter by date")
+    show_parser.add_argument("--when", "-w", default=DEFAULT_DATE_FILTER, help="Filter by time")
+    # XXX document time formats
 
     args = parser.parse_args()
     try:
@@ -317,16 +318,16 @@ if __name__ == "__main__":
             filters = FilterSettings()
             if args.when:
                 try:
-                    date_filter = parse_date_filter_arg(args.when)
-                except DateFilterException:
-                    print("invalid date filter")
+                    time_filter = TimeFilter.from_arg(args.when)
+                except TimeFilterException:
+                    print("invalid time filter")  # XXX improve message
                     sys.exit(1)
             else:
-                date_filter = DateFilter()
+                time_filter = TimeFilter()
 
             filters.tag_filters = [x[1:] for x in args.arg]
             filters.textual_filters = args.term
-            filters.date_filter = date_filter
+            filters.time_filter = time_filter
 
             jrnl.show_entries(bodies=not args.short, filters=filters)
     elif mode == "edit":

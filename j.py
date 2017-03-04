@@ -192,6 +192,16 @@ class DateFilterException(Exception):
 
 
 class DateFilter:
+    # The various absolute time formats j supports
+    ABS_TIME_FMTS = [
+        "%Y",
+        "%Y-%m",
+        "%Y-%m-%d",
+        "%Y-%m-%d %H",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d %H:%M:%S",
+    ]
+
     def __init__(self, start=None, stop=None):
         self.start = start
         self.stop = stop
@@ -240,7 +250,13 @@ def parse_date_filter_elem(elem):
 
         return datetime.now() - delta
     else:
-        raise DateFilterException()
+        for fmt in DateFilter.ABS_TIME_FMTS:
+            try:
+                return datetime.strptime(elem, fmt) 
+            except ValueError:
+                continue
+        else:
+            raise DateFilterException()
 
 
 def parse_date_filter_arg(arg):

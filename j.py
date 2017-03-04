@@ -3,10 +3,10 @@
 import logging
 import sys
 import os
-import datetime
 import tempfile
 import time
 import argparse
+from datetime import datetime, timedelta
 
 try:
     JRNL_DIR = os.environ["J_JOURNAL_DIR"]
@@ -47,7 +47,7 @@ class Entry:
     def parse(self, meta_only=False):
         # Get the time from the file path first
         tstr = os.path.basename(self.path).split("-")[0]
-        self.date = datetime.datetime.strptime(tstr, TIME_FORMAT)
+        self.date = datetime.strptime(tstr, TIME_FORMAT)
 
         with open(self.path) as fh:
             lines = iter(fh.readlines())
@@ -116,7 +116,7 @@ class Journal:
         logging.debug("journal directory is '%s'" % self.directory)
 
     def new_entry(self):
-        now = datetime.datetime.now()
+        now = datetime.now()
         prefix = now.strftime("%s-" % TIME_FORMAT)
         fd, path = tempfile.mkstemp(dir=self.directory, prefix=prefix)
         os.close(fd)
@@ -131,6 +131,11 @@ class Journal:
                 add = True
                 entry = Entry(os.path.join(self.directory, fl.name),
                               meta_only=not bodies)
+
+                # Only add if the time filter matches
+                if filters.date_filter:
+                    if not filters.date_filter.matches(entry):
+                        continue
 
                 # Only add if *all* tag filters match
                 if filters.tag_filters:
@@ -191,13 +196,51 @@ class DateFilter:
         self.start = start
         self.stop = stop
 
-    def matches(self, date):
-        return True # XXX
+    def matches(self, entry):
+        if not self.start:
+            assert not self.stop
+            # filter matches anything
+            return True
+
+        if not self.stop:
+            stop = datetime.now()
+        else:
+            stop = self.stop
+
+        if self.start <= entry.date <= stop:
+            return True
+        else:
+            return False
 
 
 def parse_date_filter_elem(elem):
-    # XXX
-    return None
+    if len(elem) > 1 and elem[-1] in ("d", "w", "m", "y", "h", "M"):
+        # relative to now
+        try:
+            num = int(elem[:-1])
+        except ValueError:
+            raise DateFilterException()
+
+        unit = elem[-1]
+
+        if unit == "M":
+            delta = timedelta(minutes=num)
+        elif unit == "h":
+            delta = timedelta(hours=num)
+        elif unit == "d":
+            delta = timedelta(days=num)
+        elif unit == "w":
+            delta = timedelta(days=num * 7)
+        elif unit == "m":
+            delta = timedelta(days=num * 31)  # roughly
+        elif unit == "y":
+            delta = timedelta(days=num * 365)  # roughly
+        else:
+            assert False  # unreachable
+
+        return datetime.now() - delta
+    else:
+        raise DateFilterException()
 
 
 def parse_date_filter_arg(arg):
@@ -211,6 +254,9 @@ def parse_date_filter_arg(arg):
         stop = parse_date_filter_elem(elems[1])
     else:
         stop = None
+
+    if stop and start > stop:
+        raise DateFilterException()
     return DateFilter(start, stop)
 
 

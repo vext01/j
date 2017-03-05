@@ -335,6 +335,7 @@ if __name__ == "__main__":
 
             jrnl.show_entries(bodies=not args.short, filters=filters)
     elif mode == "edit":
+        # XXX filters
         if len(args.arg) != 1:
             edit_parser.print_help()
             sys.exit(1)

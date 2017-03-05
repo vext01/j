@@ -24,9 +24,10 @@ DOUBLE_RULE = "=" * RULE_SIZE
 
 
 class FilterSettings:
-    def __init__(self, tag_filters=None, textual_filters=None):
+    def __init__(self, tag_filters=None, textual_filters=None, time_filter=None):
         self.tag_filters = tag_filters
         self.textual_filters = textual_filters
+        self.time_filter = time_filter
 
 
 class TimeFilterException(Exception):
@@ -315,7 +316,6 @@ if __name__ == "__main__":
             jrnl.show_single_entry(args.arg[0], body=not args.short)
         else:
             # XXX check all tags start with @
-            filters = FilterSettings()
             if args.when:
                 try:
                     time_filter = TimeFilter.from_arg(args.when)
@@ -325,9 +325,13 @@ if __name__ == "__main__":
             else:
                 time_filter = TimeFilter()
 
-            filters.tag_filters = [x[1:] for x in args.arg]
-            filters.textual_filters = args.term
-            filters.time_filter = time_filter
+            tag_filters = [x[1:] for x in args.arg]
+            textual_filters = args.term
+            filters = FilterSettings(
+                tag_filters=tag_filters,
+                textual_filters=textual_filters,
+                time_filter=time_filter
+            )
 
             jrnl.show_entries(bodies=not args.short, filters=filters)
     elif mode == "edit":

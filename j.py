@@ -14,13 +14,23 @@ except KeyError:
     print("Please set J_JOURNAL_DIR")
     sys.exit(1)
 
-DEFAULT_DATE_FILTER = os.environ.get("J_JOURNAL_DEFAULT_DATE_FILTER")
+DEFAULT_DATE_FILTER = os.environ.get("J_JOURNAL_DEFAULT_TIME")
 
 EDITOR = os.environ.get("EDITOR", "vi")
 TIME_FORMAT = "%Y%m%d_%H%M%S"
 
 RULE_SIZE = 78
 DOUBLE_RULE = "=" * RULE_SIZE
+
+WHEN_HELP = """Time formats for -w are of the form `start[:end]`, where start
+and end are either an absolute time, or a time relative to now. Absolute times
+are of the form `YYYY[-MM[-DD[ HH[:MM[:SS]]]]]`. Relative times are of the form
+`nU` where `n` is a number and `U` is a unit drawn from `{M,h,d,w,m,y}` for
+minutes, hours, days, weeks, months or years before now. If `end` is omitted,
+then the end date is the distant future. If no -w is specified, then the
+environment variable J_JOURNAL_DEFAULT_TIME is used, otherwise no date filter
+is used.
+"""
 
 
 class FilterSettings:
@@ -291,13 +301,12 @@ if __name__ == "__main__":
     edit_parser.set_defaults(mode='edit')
     edit_parser.add_argument("arg", nargs="*", help="entry id or tag to edit")
 
-    show_parser = subparsers.add_parser('show', aliases=['s'])
+    show_parser = subparsers.add_parser('show', aliases=['s'], epilog=WHEN_HELP)
     show_parser.set_defaults(mode='show')
     show_parser.add_argument("arg", nargs="*", help="an id to show or @tags to filter by")
     show_parser.add_argument("--short", "-s", action="store_true", help="omit bodies")
     show_parser.add_argument("--term", "-t", nargs="*", default=None, help="Filter by search terms")
     show_parser.add_argument("--when", "-w", default=DEFAULT_DATE_FILTER, help="Filter by time")
-    # XXX document time formats
 
     args = parser.parse_args()
     try:

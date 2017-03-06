@@ -339,7 +339,10 @@ if __name__ == "__main__":
 
             jrnl.show_single_entry(args.arg[0], body=not args.short)
         else:
-            # XXX check all tags start with @
+            if not all([t.startswith("@") for t in args.arg]):
+                print("all tags must begin with '@'")
+                sys.exit(1)
+
             if args.when:
                 try:
                     time_filter = TimeFilter.from_arg(args.when)

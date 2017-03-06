@@ -61,6 +61,7 @@ class TimeFilter:
 
     @classmethod
     def from_arg(cls, arg):
+        # XXX allow only an end
         elems = arg.split(":")
         num_elems = len(elems)
         if not (1 <= num_elems <= 2):

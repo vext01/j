@@ -272,7 +272,6 @@ class Journal:
         self._invoke_editor([path])
 
     def edit_tag(self, tag):
-        # XXX if there are lots of matches, how does the user exit?
         # XXX edit tag with timeframe?
         filters = FilterSettings(tag_filters=[tag])
         entries = self._collect_entries(filters, bodies=False)

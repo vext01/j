@@ -7,6 +7,7 @@ import tempfile
 import time
 import argparse
 from datetime import datetime, timedelta
+import subprocess
 
 try:
     JRNL_DIR = os.environ["J_JOURNAL_DIR"]
@@ -146,6 +147,7 @@ class Entry:
         return os.path.basename(self.path)
 
     def parse(self, meta_only=False):
+        logging.debug("parsing '%s'" % self.path)
         # Get the time from the file path first
         tstr = os.path.basename(self.path).split("-")[0]
         self.time = datetime.strptime(tstr, TIME_FORMAT)
@@ -221,7 +223,7 @@ class Journal:
         prefix = now.strftime("%s-" % TIME_FORMAT)
         fd, path = tempfile.mkstemp(dir=self.directory, prefix=prefix)
         os.close(fd)
-        self._invoke_editor(path)
+        self._invoke_editor([path])
 
     def _collect_entries(self, filters, bodies=True):
         itr = os.scandir(self.directory)
@@ -267,28 +269,36 @@ class Journal:
 
     def edit_entry(self, ident):
         path = os.path.join(self.directory, ident)
-        self._invoke_editor(path)
+        self._invoke_editor([path])
 
     def edit_tag(self, tag):
         # XXX if there are lots of matches, how does the user exit?
         # XXX edit tag with timeframe?
         filters = FilterSettings(tag_filters=[tag])
         entries = self._collect_entries(filters, bodies=False)
-        for entry in entries:
-            self._invoke_editor(entry.path)
+        self._invoke_editor([e.path for e in entries])
 
-    def _invoke_editor(self, path):
-        os.system("%s %s" % (EDITOR, path))
-        try:
-            Entry(path)  # just check it parses
-        except ParseError as e:
-            # XXX try again
-            # Offer to delete if not and this is a new entry?
-            print("parsing failed: %s" % e)
-            sys.exit(1)
+    def _invoke_editor(self, paths):
+        while True:
+            args = [EDITOR] + paths
+            subprocess.check_call(args)
+
+            problem_paths = []
+            for path in paths:
+                try:
+                    Entry(path)  # just check it parses
+                except ParseError as e:
+                    problem_paths.append(path)
+            if not problem_paths:
+                break  # all is well
+            print("Error! %d files failed to parse!" % len(problem_paths))
+            print("Press enter to try again")
+            paths = problem_paths
+            input()
 
 
 if __name__ == "__main__":
+    # XXX use env var
     logging.root.setLevel(logging.DEBUG)
     jrnl = Journal(JRNL_DIR)
 

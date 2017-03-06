@@ -331,8 +331,13 @@ if __name__ == "__main__":
         jrnl.new_entry()
     elif mode == "show":
         if len(args.arg) == 1 and not args.arg[0].startswith("@"):
-            # XXX -t makes no sense it this case
-            # XXX -w makes no sense it this case
+            if args.term:
+                print("--term (or -t) make no sense when displaying one entry")
+                sys.exit(1)
+            if args.when:
+                print("--when (or -w) make no sense when displaying one entry")
+                sys.exit(1)
+
             jrnl.show_single_entry(args.arg[0], body=not args.short)
         else:
             # XXX check all tags start with @

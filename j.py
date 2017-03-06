@@ -322,7 +322,6 @@ if __name__ == "__main__":
     try:
         mode = args.mode
     except AttributeError:
-        mode = "show"
         parser.print_help()
         sys.exit(1)
 

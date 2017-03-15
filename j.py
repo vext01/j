@@ -272,7 +272,6 @@ class Journal:
         self._invoke_editor([path])
 
     def edit_tag(self, tag):
-        # XXX edit tag with timeframe?
         filters = FilterSettings(tag_filters=[tag])
         entries = self._collect_entries(filters, bodies=False)
         self._invoke_editor([e.path for e in entries])

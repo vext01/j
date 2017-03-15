@@ -297,8 +297,9 @@ class Journal:
 
 
 if __name__ == "__main__":
-    # XXX use env var
-    logging.root.setLevel(logging.DEBUG)
+    if os.environ.get("J_JOURNAL_DEBUG"):
+        logging.root.setLevel(logging.DEBUG)
+
     jrnl = Journal(JRNL_DIR)
 
     parser = argparse.ArgumentParser()

@@ -23,8 +23,8 @@ TIME_FORMAT = "%Y%m%d_%H%M%S"
 RULE_SIZE = 78
 DOUBLE_RULE = "=" * RULE_SIZE
 
-WHEN_HELP = """Time formats for -w are of the form `start[:end]`, where start
-and end are either an absolute time, or a time relative to now. Absolute times
+WHEN_HELP = """Time formats for -w are of the form `[start][:[end]]`, where start
+and end are either an absolute time, or a relative time before now. Absolute times
 are of the form `YYYY[-MM[-DD[ HH[:MM[:SS]]]]]`. Relative times are of the form
 `nU` where `n` is a number and `U` is a unit drawn from `{M,h,d,w,m,y}` for
 minutes, hours, days, weeks, months or years before now. If `end` is omitted,
@@ -56,31 +56,37 @@ class TimeFilter:
         "%Y-%m-%d %H:%M:%S",
     ]
 
-    def __init__(self, start=None, stop=None):
+    def __init__(self, start=datetime.min, stop=datetime.max):
         self.start = start
         self.stop = stop
 
     @classmethod
     def from_arg(cls, arg):
-        # XXX allow only an end
         elems = arg.split(":")
         num_elems = len(elems)
         if not (1 <= num_elems <= 2):
             raise TimeFilterException()
 
-        start = cls._parse_time_filter_elem(elems[0])
+        start = cls._parse_time_filter_elem(elems[0], "start")
+        stop = datetime.max  # distant future
         if num_elems == 2:
-            stop = cls._parse_time_filter_elem(elems[1])
-        else:
-            stop = None
+            stop = cls._parse_time_filter_elem(elems[1], "stop")
 
-        if stop and start > stop:
+        if start > stop:
             raise TimeFilterException()
         return cls(start, stop)
 
     @staticmethod
-    def _parse_time_filter_elem(elem):
-        if len(elem) > 1 and elem[-1] in ("d", "w", "m", "y", "h", "M"):
+    def _parse_time_filter_elem(elem, which):
+        assert which in ["start", "stop"]
+
+        if elem == "":
+            # No constraint
+            if which == "start":
+                return datetime.min  # the distant past
+            else:
+                return datetime.max  # the distant future
+        elif len(elem) > 1 and elem[-1] in ("d", "w", "m", "y", "h", "M"):
             # relative to now
             try:
                 num = int(elem[:-1])

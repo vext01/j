@@ -23,14 +23,14 @@ TIME_FORMAT = "%Y%m%d_%H%M%S"
 RULE_SIZE = 78
 DOUBLE_RULE = "=" * RULE_SIZE
 
-WHEN_HELP = """Time formats for -w are of the form `[start][:[end]]`, where start
-and end are either an absolute time, or a relative time before now. Absolute times
-are of the form `YYYY[-MM[-DD[ HH[:MM[:SS]]]]]`. Relative times are of the form
-`nU` where `n` is a number and `U` is a unit drawn from `{M,h,d,w,m,y}` for
-minutes, hours, days, weeks, months or years before now. If `end` is omitted,
-then the end date is the distant future. If no -w is specified, then the
-environment variable J_JOURNAL_DEFAULT_TIME is used, otherwise no date filter
-is used.
+WHEN_HELP = """Time formats for -w are of the form `[start][:[end]]`, where
+start and end are either an absolute time, or a relative time before now.
+Absolute times are of the form `YYYY[-MM[-DD[ HH[:MM[:SS]]]]]`. Relative times
+are of the form `nU` where `n` is a number and `U` is a unit drawn from
+`{M,h,d,w,m,y}` for minutes, hours, days, weeks, months or years before now. If
+`end` is omitted, then the end date is the distant future. If no -w is
+specified, then the environment variable J_JOURNAL_DEFAULT_TIME is used,
+otherwise no date filter is used.
 """
 
 

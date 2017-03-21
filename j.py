@@ -65,7 +65,7 @@ class TimeFilter:
         elems = arg.split(":")
         num_elems = len(elems)
         if not (1 <= num_elems <= 2):
-            raise TimeFilterException()
+            raise TimeFilterException("wrong number of time elements")
 
         start = cls._parse_time_filter_elem(elems[0], "start")
         stop = datetime.max  # distant future
@@ -73,7 +73,7 @@ class TimeFilter:
             stop = cls._parse_time_filter_elem(elems[1], "stop")
 
         if start > stop:
-            raise TimeFilterException()
+            raise TimeFilterException("start time is later than stop time")
         return cls(start, stop)
 
     @staticmethod
@@ -91,7 +91,7 @@ class TimeFilter:
             try:
                 num = int(elem[:-1])
             except ValueError:
-                raise TimeFilterException()
+                raise TimeFilterException("bogus time spec element")
 
             unit = elem[-1]
 
@@ -118,7 +118,7 @@ class TimeFilter:
                 except ValueError:
                     continue
             else:
-                raise TimeFilterException()
+                raise TimeFilterException("bogus time spec element")
 
     def matches(self, entry):
         if not self.start:
@@ -291,7 +291,7 @@ class Journal:
             for path in paths:
                 try:
                     Entry(path)  # just check it parses
-                except ParseError as e:
+                except ParseError:
                     problem_paths.append(path)
             if not problem_paths:
                 break  # all is well
@@ -351,8 +351,8 @@ if __name__ == "__main__":
             if args.when:
                 try:
                     time_filter = TimeFilter.from_arg(args.when)
-                except TimeFilterException:
-                    print("invalid time filter")  # XXX improve message
+                except TimeFilterException as e:
+                    print("invalid time filter: %s" % e)
                     sys.exit(1)
             else:
                 time_filter = TimeFilter()

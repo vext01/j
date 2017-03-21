@@ -161,35 +161,42 @@ class Entry:
         with open(self.path) as fh:
             lines = iter(fh.readlines())
 
+            # Required title line
             try:
-                # Required title line
                 self.title = lines.__next__().strip()
-                if self.title == "":
-                    raise ParseError("no title")
+                if self.title.strip() == "":
+                    raise ParseError("whitespace title")
+            except StopIteration:
+                raise ParseError("unexpected end of file")
 
-                # Optional attribute line
+            # Attribute line or EOF
+            try:
                 attr_line = lines.__next__().strip()
-                if attr_line != "":
-                    attrs = attr_line.split(" ")
-                    # We only support tags here for now
-                    for attr in attrs:
-                        if not attr.startswith("@"):
-                            raise ParseError("unknown attribue %s" % attr)
-                    self.tags = set([x[1:] for x in attrs])
+            except StopIteration:
+                return
 
-                    # Now expect a blank line
+            if attr_line != "":
+                attrs = attr_line.split(" ")
+                # We only support tags here for now
+                for attr in attrs:
+                    if not attr.startswith("@"):
+                        raise ParseError("unknown attribue %s" % attr)
+                self.tags = set([x[1:] for x in attrs])
+
+                # Now expect a blank line or EOF
+                try:
                     blank_line = lines.__next__().strip()
                     if blank_line != "":
                         raise ParseError("expected blank line after header")
-                else:
-                    pass  # blank attr line serves as the body separator
-
-                if meta_only:
+                except StopIteration:
                     return
+            else:
+                pass  # blank attr line serves as the body separator
 
-                self.body = "".join(lines)
-            except StopIteration:
-                raise ParseError("unexpected end of file")
+            if meta_only:
+                return
+
+            self.body = "".join(lines)
 
     def __str__(self):
         time_str = str(self.time)
@@ -283,22 +290,31 @@ class Journal:
         self._invoke_editor([e.path for e in entries])
 
     def _invoke_editor(self, paths):
+        cached_paths = paths[:]  # below code mutates 'paths'
         while True:
             args = [EDITOR] + paths
             subprocess.check_call(args)
 
-            problem_paths = []
+            problem_paths = {}
             for path in paths:
                 try:
                     Entry(path)  # just check it parses
-                except ParseError:
-                    problem_paths.append(path)
+                except ParseError as e:
+                    problem_paths[path] = str(e)
             if not problem_paths:
                 break  # all is well
-            print("Error! %d files failed to parse!" % len(problem_paths))
-            print("Press enter to try again")
-            paths = problem_paths
+            print("Error! %d files failed to parse:" % len(problem_paths))
+            for path, reason in problem_paths.items():
+                print("  %s: %s" % (path, reason))
+
+            print("\nPress enter to try again")
+            paths = list(problem_paths.keys())
             input()
+
+        # OK
+        print("\nPaths changed:")
+        for i in cached_paths:
+            print(" + %s" % i)
 
 
 if __name__ == "__main__":

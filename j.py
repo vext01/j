@@ -309,8 +309,13 @@ class Journal:
 
             print("\nPress enter to try again")
             paths = list(problem_paths.keys())
-            input()
-
+            try:
+                input()
+            except KeyboardInterrupt:
+                print("\nYou will need to manually fix/remove:")
+                for i in paths:
+                    print(" + %s" % i)
+                return
         # OK
         print("\nPaths changed:")
         for i in cached_paths:

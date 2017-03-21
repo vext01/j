@@ -5,6 +5,7 @@ import sys
 import os
 import tempfile
 import argparse
+import io
 from datetime import datetime, timedelta
 import subprocess
 
@@ -269,15 +270,24 @@ class Journal:
 
                 # Passed all filters
                 entries.append(entry)
-        return sorted(entries, key=lambda e: e.time)
+        return sorted(entries, key=lambda e: e.time, reverse=True)
 
     def show_entries(self, filters=None, bodies=True):
         if not filters:
             filters = FilterSettings()
 
         entries = self._collect_entries(bodies=bodies, filters=filters)
+
+        of = io.StringIO()
         for e in entries:
-            print(str(e))
+            of.write(str(e) + "\n")
+
+        p = subprocess.Popen("less", shell=True, stdin=subprocess.PIPE)
+        sout, serr = p.communicate(
+            of.getvalue().encode(sys.getdefaultencoding()))
+        if p.returncode != 0:
+            print("failed to run less")
+            sys.exit(1)
 
     def show_single_entry(self, ident, body=False):
         print(Entry(os.path.join(self.directory, ident), meta_only=not body))

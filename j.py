@@ -4,7 +4,6 @@ import logging
 import sys
 import os
 import tempfile
-import time
 import argparse
 from datetime import datetime, timedelta
 import subprocess
@@ -35,7 +34,8 @@ otherwise no date filter is used.
 
 
 class FilterSettings:
-    def __init__(self, tag_filters=None, textual_filters=None, time_filter=None):
+    def __init__(self, tag_filters=None, textual_filters=None,
+                 time_filter=None):
         self.tag_filters = tag_filters
         self.textual_filters = textual_filters
         self.time_filter = time_filter
@@ -139,6 +139,7 @@ class TimeFilter:
 
 class ParseError(Exception):
     pass
+
 
 class Entry:
     def __init__(self, path, meta_only=False):
@@ -244,7 +245,6 @@ class Journal:
 
         entries = []
         for fl in files:
-                add = True
                 entry = Entry(os.path.join(self.directory, fl.name),
                               meta_only=not bodies)
 
@@ -255,13 +255,15 @@ class Journal:
 
                 # Only add if *all* tag filters match
                 if filters.tag_filters:
-                    matches = [entry.matches_tag(t) for t in filters.tag_filters]
+                    matches = [entry.matches_tag(t) for t in
+                               filters.tag_filters]
                     if not all(matches):
                         continue
 
                 # Only add if *all* textual filters match
                 if filters.textual_filters:
-                    matches = [entry.matches_term(t) for t in filters.textual_filters]
+                    matches = [entry.matches_term(t) for t in
+                               filters.textual_filters]
                     if not all(matches):
                         continue
 
@@ -338,12 +340,17 @@ if __name__ == "__main__":
     edit_parser.set_defaults(mode='edit')
     edit_parser.add_argument("arg", nargs="*", help="entry id or tag to edit")
 
-    show_parser = subparsers.add_parser('show', aliases=['s'], epilog=WHEN_HELP)
+    show_parser = subparsers.add_parser('show', aliases=['s'],
+                                        epilog=WHEN_HELP)
     show_parser.set_defaults(mode='show')
-    show_parser.add_argument("arg", nargs="*", help="an id to show or @tags to filter by")
-    show_parser.add_argument("--short", "-s", action="store_true", help="omit bodies")
-    show_parser.add_argument("--term", "-t", nargs="*", default=None, help="Filter by search terms")
-    show_parser.add_argument("--when", "-w", default=DEFAULT_DATE_FILTER, help="Filter by time")
+    show_parser.add_argument("arg", nargs="*",
+                             help="an id to show or @tags to filter by")
+    show_parser.add_argument("--short", "-s", action="store_true",
+                             help="omit bodies")
+    show_parser.add_argument("--term", "-t", nargs="*", default=None,
+                             help="Filter by search terms")
+    show_parser.add_argument("--when", "-w", default=DEFAULT_DATE_FILTER,
+                             help="Filter by time")
 
     args = parser.parse_args()
     try:

@@ -225,22 +225,55 @@ class Entry:
 
 
 class Journal:
-    def __init__(self, directory):
+    def __init__(self, directory, pager="less"):
         self.directory = directory
+        self.pager = pager
 
         if not os.path.exists(self.directory):
             logging.debug("creating '%s'" % self.directory)
             os.makedirs(self.directory)
         logging.debug("journal directory is '%s'" % self.directory)
 
-    def new_entry(self):
+    def _new_entry_create(self, **contents):
+        """Create a new file for a new entry.
+
+        Contents, if passed, is a dict with at least the key "title", and
+        optionally "attrs" and "body". Each value in the dict is a string for
+        each line (or for multiple lines in the case of body). This is used in
+        testing to pre-populate the entry, since testing the interactive
+        section of `invoke_editor` would be awkward.
+
+        Under normal circumstances this function just makes a blank file.
+        """
+
         now = datetime.now()
         prefix = now.strftime("%s-" % TIME_FORMAT)
         fd, path = tempfile.mkstemp(dir=self.directory, prefix=prefix)
+
+        if contents:
+            assert "title" in contents.keys()
+            os.write(fd, (contents["title"] + "\n").encode(
+                sys.getdefaultencoding()))
+
+            if "attrs" in contents.keys():
+                os.write(fd, (contents["attrs"] + "\n").encode(
+                    sys.getdefaultencoding()))
+
+            if "body" in contents.keys():
+                os.write(fd, ("\n" + contents["body"]).encode(
+                    sys.getdefaultencoding()))
+
         os.close(fd)
+        return path
+
+    def new_entry(self):
+        path = self._new_entry_create()
         self._invoke_editor([path])
 
-    def _collect_entries(self, filters, bodies=True):
+    def _collect_entries(self, filters=None, bodies=True):
+        if filters is None:
+            filters = FilterSettings()
+
         itr = os.scandir(self.directory)
         files = filter(lambda x: x.is_file(), itr)
 
@@ -282,12 +315,15 @@ class Journal:
         for e in entries:
             of.write(str(e) + "\n")
 
-        p = subprocess.Popen("less", shell=True, stdin=subprocess.PIPE)
-        sout, serr = p.communicate(
-            of.getvalue().encode(sys.getdefaultencoding()))
-        if p.returncode != 0:
-            print("failed to run less")
-            sys.exit(1)
+        if self.pager:
+            p = subprocess.Popen(self.pager, shell=True, stdin=subprocess.PIPE)
+            sout, serr = p.communicate(
+                of.getvalue().encode(sys.getdefaultencoding()))
+            if p.returncode != 0:
+                print("failed to run '%s'" % self.pager)
+                sys.exit(1)
+        else:
+            print(of.getvalue())
 
     def show_single_entry(self, ident, body=False):
         print(Entry(os.path.join(self.directory, ident), meta_only=not body))

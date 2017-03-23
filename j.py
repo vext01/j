@@ -398,6 +398,10 @@ if __name__ == "__main__":
     show_parser.add_argument("--when", "-w", default=DEFAULT_DATE_FILTER,
                              help="Filter by time")
 
+    # Running with no args displays the journal, same as 'j s'
+    if len(sys.argv[1:]) == 0:
+        sys.argv.append("show")
+
     args = parser.parse_args()
     try:
         mode = args.mode

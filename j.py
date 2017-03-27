@@ -34,6 +34,83 @@ otherwise no date filter is used.
 """
 
 
+class Colours(dict):
+    # ANSI colour sequences for:
+    KEYS = [
+        "meta",         # entry meta-data, e.g. ID, date, ...
+        "title",        # entry title
+        "attrs",        # attributes line
+        "rule",         # rule between entries
+        "body",         # entry body text
+    ]
+
+    ANSI_COLOURS = {
+        "red":              "\033[0;31m",
+        "green":            "\033[0;32m",
+        "yellow":           "\033[0;33m",
+        "blue":             "\033[0;34m",
+        "magenta":          "\033[0;35m",
+        "cyan":             "\033[0;36m",
+        "white":            "\033[0;37m",
+        "bright-red":       "\033[1;31m",
+        "bright-green":    "\033[1;32m",
+        "bright-yellow":   "\033[1;33m",
+        "bright-blue":     "\033[1;34m",
+        "bright-magenta":  "\033[1;35m",
+        "bright-cyan":     "\033[1;36m",
+        "bright-white":    "\033[1;37m",
+    }
+
+    ANSI_RESET = "\033[0;0m"
+
+    def __init__(self):
+        # These get set to ANSI escape chars if the user specifies a colour
+        for k in Colours.KEYS:
+            self[k] = ""  # defaults to no colour
+        self.reset_seq = ""
+
+    @classmethod
+    def from_str(cls, spec_str):
+        inst = cls()
+
+        pairs = spec_str.split(",")
+
+        # If at least one colour is set, then start using ANSI_RESET
+        if pairs:
+            inst.reset_seq = Colours.ANSI_RESET
+
+        for pair in pairs:
+            try:
+                k, v = pair.split("=")
+            except ValueError:
+                print("malformed colour setting: '%s'" % pair)
+                sys.exit()
+
+            if k not in inst.keys():
+                print("unknown colour key: '%s'" % k)
+                sys.exit()
+
+            try:
+                esc_seq = Colours.ANSI_COLOURS[v]
+            except KeyError:
+                print("Unknown colour: '%s'" % v)
+                sys.exit()
+
+            inst[k] = esc_seq
+        return inst
+
+    def reset(self):
+        return self.reset_seq
+
+
+# XXX It would be easier to test if this stuff were not global
+COLOUR_SPEC = os.environ.get("J_JOURNAL_COLOURS", None)
+if COLOUR_SPEC:
+    COLOURS = Colours.from_str(COLOUR_SPEC)
+else:
+    COLOURS = Colours()
+
+
 class FilterSettings:
     def __init__(self, tag_filters=None, textual_filters=None,
                  time_filter=None):
@@ -204,16 +281,23 @@ class Entry:
         time_str = str(self.time)
         pad = " " * (RULE_SIZE - len(time_str) - len(self.ident()))
         headers = [
-            DOUBLE_RULE,
-            "%s%s%s" % (time_str, pad, self.ident()),
-            self.title.center(RULE_SIZE),
+            "%s%s%s" % (COLOURS["rule"], DOUBLE_RULE, COLOURS.reset()),
+            "%s%s%s%s%s" % (COLOURS["meta"], time_str, pad, self.ident(),
+                            COLOURS.reset()),
+            "%s%s%s" % (COLOURS["title"], self.title.center(RULE_SIZE),
+                        COLOURS.reset()),
         ]
         if self.tags:
             atted_tags = ["@%s" % x for x in self.tags]
-            headers.append(" ".join(atted_tags).center(RULE_SIZE))
+            attr_line = " ".join(atted_tags).center(RULE_SIZE)
+            headers.append("%s%s%s" % (COLOURS["attrs"], attr_line,
+                                       COLOURS.reset()))
         rec = "\n".join(headers)
         if self.body:
-            rec += "\n\n%s" % self.body
+            # ANSI colours reset at EOL, so we have to mark up each line
+            rec += "\n\n"
+            for line in self.body.splitlines():
+                rec += ("%s%s%s\n" % (COLOURS["body"], line, COLOURS.reset()))
         return rec
 
     def matches_tag(self, tag):
@@ -225,7 +309,7 @@ class Entry:
 
 
 class Journal:
-    def __init__(self, directory, pager="less"):
+    def __init__(self, directory, pager="less -R"):
         self.directory = directory
         self.pager = pager
 

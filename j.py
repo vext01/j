@@ -509,8 +509,9 @@ if __name__ == "__main__":
 
     date_filter = os.environ.get("J_JOURNAL_DEFAULT_TIME")
     editor = os.environ.get("EDITOR", DEFAULT_EDITOR)
+    pager = os.environ.get("J_JOURNAL_PAGER", DEFAULT_PAGER)
 
-    jrnl = Journal(jrnl_dir, colours, editor)
+    jrnl = Journal(jrnl_dir, colours=colours, editor=editor, pager=pager)
 
     # Command line interface
     parser = argparse.ArgumentParser()

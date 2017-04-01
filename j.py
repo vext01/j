@@ -475,7 +475,8 @@ class Journal:
             print(of.getvalue())
 
     def show_single_entry(self, ident, body=False):
-        print(Entry(os.path.join(self.directory, ident), meta_only=not body))
+        entry = Entry(os.path.join(self.directory, ident), meta_only=not body)
+        print(entry.format(self.colours))
 
     def _edit_existing_entries(self, entries):
         """
@@ -607,9 +608,6 @@ if __name__ == "__main__":
         if len(args.arg) == 1 and not args.arg[0].startswith("@"):
             if args.term:
                 print("--term (or -t) make no sense when displaying one entry")
-                sys.exit(1)
-            if args.when:
-                print("--when (or -w) make no sense when displaying one entry")
                 sys.exit(1)
 
             jrnl.show_single_entry(args.arg[0], body=not args.short)

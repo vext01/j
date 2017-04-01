@@ -153,10 +153,11 @@ class Colours(dict):
 
 class FilterSettings:
     def __init__(self, tag_filters=None, textual_filters=None,
-                 time_filter=None):
+                 time_filter=None, id_filters=None):
         self.tag_filters = tag_filters
         self.textual_filters = textual_filters
         self.time_filter = time_filter
+        self.id_filters = id_filters
 
 
 class TimeFilterException(Exception):
@@ -350,6 +351,9 @@ class Entry:
         with open(self.path) as fh:
             return term in fh.read()
 
+    def matches_ids(self, ids):
+        return os.path.basename(self.path) in ids
+
 
 class Journal:
     def __init__(self, directory, colours=None, editor=DEFAULT_EDITOR,
@@ -432,6 +436,8 @@ class Journal:
                               meta_only=not bodies)
 
                 # Only add if the time filter matches
+                # XXX invert the relationship between the filter an the entry
+                # like the other filters XXX.
                 if filters.time_filter:
                     if not filters.time_filter.matches(entry):
                         continue
@@ -448,6 +454,11 @@ class Journal:
                     matches = [entry.matches_term(t) for t in
                                filters.textual_filters]
                     if not all(matches):
+                        continue
+
+                # Only add if the id matches one of the id filters
+                if filters.id_filters:
+                    if not entry.matches_ids(filters.id_filters):
                         continue
 
                 # Passed all filters
@@ -473,10 +484,6 @@ class Journal:
                 sys.exit(1)
         else:
             print(of.getvalue())
-
-    def show_single_entry(self, ident, body=False):
-        entry = Entry(os.path.join(self.directory, ident), meta_only=not body)
-        print(entry.format(self.colours))
 
     def _edit_existing_entries(self, entries):
         """
@@ -561,6 +568,7 @@ if __name__ == "__main__":
     time_filter = os.environ.get("J_JOURNAL_TIME")
     editor = os.environ.get("EDITOR", DEFAULT_EDITOR)
     pager = os.environ.get("J_JOURNAL_PAGER", DEFAULT_PAGER)
+    # XXX make rule configurable.
 
     jrnl = Journal(jrnl_dir, colours=colours, editor=editor, pager=pager)
 
@@ -581,7 +589,7 @@ if __name__ == "__main__":
     show_parser = subparsers.add_parser('show', aliases=['s'])
     show_parser.set_defaults(mode='show')
     show_parser.add_argument("arg", nargs="*",
-                             help="an id to show or @tags to filter by. "
+                             help="an id to show or a @tag to filter by. "
                              "If omitted, shows all entries matching filters.")
     show_parser.add_argument("--short", "-s", action="store_true",
                              help="omit entry bodies.")
@@ -605,35 +613,36 @@ if __name__ == "__main__":
     if mode == "new":
         jrnl.new_entry()
     elif mode == "show":
-        if len(args.arg) == 1 and not args.arg[0].startswith("@"):
-            if args.term:
-                print("--term (or -t) make no sense when displaying one entry")
-                sys.exit(1)
-
-            jrnl.show_single_entry(args.arg[0], body=not args.short)
-        else:
-            if not all([t.startswith("@") for t in args.arg]):
-                print("all tags must begin with '@'")
-                sys.exit(1)
-
-            if args.when:
-                try:
-                    time_filter = TimeFilter.from_arg(args.when)
-                except TimeFilterException as e:
-                    print("invalid time filter: %s" % e)
-                    sys.exit(1)
-            else:
-                time_filter = TimeFilter()
-
+        if all([not a.startswith("@") for a in args.arg]):
+            # User is passing a list of entry IDs.
+            tag_filters = []
+            id_filters = args.arg
+        elif all([a.startswith("@") for a in args.arg]):
+            # user is passing a list of tags.
             tag_filters = [x[1:] for x in args.arg]
-            textual_filters = args.term
-            filters = FilterSettings(
-                tag_filters=tag_filters,
-                textual_filters=textual_filters,
-                time_filter=time_filter
-            )
+            id_filters = []
+        else:
+            print("Positional arguments must all be @tags or all be entry IDs")
+            sys.exit(1)
 
-            jrnl.show_entries(bodies=not args.short, filters=filters)
+        # Setup filters
+        if args.when:
+            try:
+                time_filter = TimeFilter.from_arg(args.when)
+            except TimeFilterException as e:
+                print("invalid time filter: %s" % e)
+                sys.exit(1)
+        else:
+            time_filter = TimeFilter()
+
+        textual_filters = args.term
+        filters = FilterSettings(
+            tag_filters=tag_filters,
+            textual_filters=textual_filters,
+            time_filter=time_filter,
+            id_filters=id_filters,
+        )
+        jrnl.show_entries(bodies=not args.short, filters=filters)
     elif mode == "edit":
         if len(args.arg) != 1:
             edit_parser.print_help()

@@ -8,6 +8,7 @@ import argparse
 import io
 from datetime import datetime, timedelta
 import subprocess
+import shutil
 
 
 TIME_FORMAT = "%Y%m%d_%H%M%S"
@@ -17,6 +18,8 @@ DOUBLE_RULE = "=" * RULE_SIZE
 
 DEFAULT_EDITOR = "vi"
 DEFAULT_PAGER = "less -R"
+
+TMP = tempfile.gettempdir()
 
 WHEN_HELP = """Time formats for -w are of the form `[start][:[end]]`, where
 start and end are either an absolute time, or a relative time before now.
@@ -336,7 +339,7 @@ class Journal:
 
         now = datetime.now()
         prefix = now.strftime("%s-" % TIME_FORMAT)
-        fd, path = tempfile.mkstemp(dir=self.directory, prefix=prefix)
+        fd, path = tempfile.mkstemp(prefix=prefix)
 
         if contents:
             assert "title" in contents.keys()
@@ -354,9 +357,17 @@ class Journal:
         os.close(fd)
         return path
 
+    def _move_entry_in(self, path, existing):
+        basename = os.path.basename(path)
+        new_path = os.path.join(self.directory, basename)
+        if not existing:
+            assert not os.path.exists(new_path)
+        shutil.move(path, new_path)
+        return new_path
+
     def new_entry(self):
         path = self._new_entry_create()
-        self._invoke_editor([path])
+        self._invoke_editor([path], existing=False)
 
     def _collect_entries(self, filters=None, bodies=True):
         if filters is None:
@@ -416,17 +427,35 @@ class Journal:
     def show_single_entry(self, ident, body=False):
         print(Entry(os.path.join(self.directory, ident), meta_only=not body))
 
+    def _edit_existing_entries(self, entries):
+        """
+        Edit a list of existing entries using an intermediate location in
+        the temporary directory.
+
+        Args:
+          entries (list of str): list of existing entries to edit
+        """
+
+        tmp_paths = []
+        for ent in entries:
+            path = ent.path
+            basename = os.path.basename(path)
+            tmp_path = os.path.join(TMP, basename)
+            shutil.copyfile(path, tmp_path)
+            tmp_paths.append(tmp_path)
+        self._invoke_editor(tmp_paths, existing=True)
+
     def edit_entry(self, ident):
         path = os.path.join(self.directory, ident)
-        self._invoke_editor([path])
+        entry = Entry(path)
+        self._edit_existing_entries([entry])
 
     def edit_tag(self, tag):
         filters = FilterSettings(tag_filters=[tag])
         entries = self._collect_entries(filters, bodies=False)
-        self._invoke_editor([e.path for e in entries])
+        self._edit_existing_entries(entries)
 
-    def _invoke_editor(self, paths):
-        cached_paths = paths[:]  # below code mutates 'paths'
+    def _invoke_editor(self, paths, existing=False):
         while True:
             args = [self.editor] + paths
             subprocess.check_call(args)
@@ -437,9 +466,16 @@ class Journal:
                     Entry(path)  # just check it parses
                 except ParseError as e:
                     problem_paths[path] = str(e)
+                    print("[!] %s" % path)
+                else:
+                    new_path = self._move_entry_in(path, existing)
+                    if existing:
+                        print("[E] %s" % new_path)
+                    else:
+                        print("[N] %s" % new_path)
             if not problem_paths:
                 break  # all is well
-            print("Error! %d files failed to parse:" % len(problem_paths))
+            print("\nError! %d files failed to parse:" % len(problem_paths))
             for path, reason in problem_paths.items():
                 print("  %s: %s" % (path, reason))
 
@@ -448,14 +484,10 @@ class Journal:
             try:
                 input()
             except KeyboardInterrupt:
-                print("\nYou will need to manually fix/remove:")
+                print("\nTemproary entries retained:")
                 for i in paths:
                     print(" + %s" % i)
                 return
-        # OK
-        print("\nPaths changed:")
-        for i in cached_paths:
-            print(" + %s" % i)
 
 
 if __name__ == "__main__":

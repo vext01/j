@@ -396,6 +396,8 @@ class Journal:
         fd, path = tempfile.mkstemp(prefix=prefix)
 
         if contents:
+            # This is strictly for tests only.
+            # XXX ideally I think we should move this into the test suite.
             assert "title" in contents.keys()
             os.write(fd, (contents["title"] + "\n").encode(
                 sys.getdefaultencoding()))
@@ -407,6 +409,8 @@ class Journal:
             if "body" in contents.keys():
                 os.write(fd, ("\n" + contents["body"]).encode(
                     sys.getdefaultencoding()))
+
+            self._move_entry_in(path, False)
 
         os.close(fd)
         return path

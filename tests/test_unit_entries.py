@@ -28,3 +28,11 @@ def test_collect_0002(jrnl):
     ents = jrnl._collect_entries()
     assert len(ents) == 1
     assert ents[0].title == "hello"
+
+
+def test_empty_entry_0001(jrnl):
+    """Check an entry with no title fails to parse gracefully"""
+
+    jrnl._new_entry_create(title="")
+    with pytest.raises(j.ParseError):
+        jrnl._collect_entries()

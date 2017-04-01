@@ -507,7 +507,7 @@ if __name__ == "__main__":
         print("Please set J_JOURNAL_DIR")
         sys.exit(1)
 
-    date_filter = os.environ.get("J_JOURNAL_DEFAULT_TIME")
+    time_filter = os.environ.get("J_JOURNAL_TIME")
     editor = os.environ.get("EDITOR", DEFAULT_EDITOR)
     pager = os.environ.get("J_JOURNAL_PAGER", DEFAULT_PAGER)
 
@@ -533,7 +533,7 @@ if __name__ == "__main__":
                              help="omit bodies")
     show_parser.add_argument("--term", "-t", nargs="*", default=None,
                              help="Filter by search terms")
-    show_parser.add_argument("--when", "-w", default=date_filter,
+    show_parser.add_argument("--when", "-w", default=time_filter,
                              help="Filter by time")
 
     # Running with no args displays the journal, same as 'j s'

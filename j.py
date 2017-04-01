@@ -21,15 +21,65 @@ DEFAULT_PAGER = "less -R"
 
 TMP = tempfile.gettempdir()
 
-WHEN_HELP = """Time formats for -w are of the form `[start][:[end]]`, where
-start and end are either an absolute time, or a relative time before now.
-Absolute times are of the form `YYYY[-MM[-DD[ HH[:MM[:SS]]]]]`. Relative times
-are of the form `nU` where `n` is a number and `U` is a unit drawn from
-`{M,h,d,w,m,y}` for minutes, hours, days, weeks, months or years before now. If
-`end` is omitted, then the end date is the distant future. If no -w is
-specified, then the environment variable J_JOURNAL_DEFAULT_TIME is used,
-otherwise no date filter is used.
-"""
+HELP_EPILOG = """TIME FORMATS
+------------
+
+Time formats are of the form:
+
+    [start][:[end]]
+
+Where start and end are either an absolute time, or a relative time prior to
+the instant of invocation.
+
+Absolute times are of the form:
+
+    YYYY[-MM[-DD[HH[:MM[:SS]]]]]
+
+Relative times are of the form `nU` where `n` is a number and `U` is a unit
+drawn from `{M,h,d,w,m,y}` for minutes, hours, days, weeks, months or years
+before now. If `start` is omitted, then the start time is the distant past. If
+`end` is omitted, then the end time is the distant future.
+
+CONFIGURATION
+
+All configuration is done via environment variables. The following variables
+are available:
+
+    J_JOURNAL_DEBUG
+        Set to see some debug output.
+
+    J_JOURNAL_COLOURS
+        A string encoding the colour scheme for journal entries. The string is
+        a comma separated list of `key=value` pairs.
+
+        Valid keys are:
+            meta:   the colour for entry meta-data
+            title:  the colour for entry titles
+            attrs:  the colour for the entry attribute lines
+            rule:   the colour of the separating rule between entries
+            body:   the colour of entry bodies
+
+        Valid values are:
+            red, green, yellow, blue, magenta, cyan, white, bright-red,
+            bright-green, bright-yellow, bright-blue, bright-magenta,
+            bright-cyan, bright-white.
+
+        If unset, colours are off.
+
+    J_JOURNAL_DIR
+        The directory in which to store journal entries. This is required.
+
+    J_JOURNAL_TIME
+        The default time filter. See TIME FORMATS for syntax.
+
+    EDITOR
+        The editor command to use to edit journal entries. It must support
+        multiple file names on the command line. If unset, defaults to '%s'.
+
+    PAGER
+        The pager command used to scroll entries. If unset, defaults to
+        '%s'.
+""" % (DEFAULT_EDITOR, DEFAULT_PAGER)
 
 
 class Colours(dict):
@@ -514,7 +564,9 @@ if __name__ == "__main__":
     jrnl = Journal(jrnl_dir, colours=colours, editor=editor, pager=pager)
 
     # Command line interface
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        epilog=HELP_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     subparsers = parser.add_subparsers()
 
     new_parser = subparsers.add_parser('new', aliases=['n'])
@@ -522,19 +574,21 @@ if __name__ == "__main__":
 
     edit_parser = subparsers.add_parser('edit', aliases=['e'])
     edit_parser.set_defaults(mode='edit')
-    edit_parser.add_argument("arg", nargs="*", help="entry id or tag to edit")
+    edit_parser.add_argument("arg", nargs="*",
+                             help="entry id or @tag to edit.")
 
-    show_parser = subparsers.add_parser('show', aliases=['s'],
-                                        epilog=WHEN_HELP)
+    show_parser = subparsers.add_parser('show', aliases=['s'])
     show_parser.set_defaults(mode='show')
     show_parser.add_argument("arg", nargs="*",
-                             help="an id to show or @tags to filter by")
+                             help="an id to show or @tags to filter by. "
+                             "If omitted, shows all entries matching filters.")
     show_parser.add_argument("--short", "-s", action="store_true",
-                             help="omit bodies")
-    show_parser.add_argument("--term", "-t", nargs="*", default=None,
-                             help="Filter by search terms")
+                             help="omit entry bodies.")
+    show_parser.add_argument("--term", "-t", action="append", default=None,
+                             help="Filter by search terms.")
     show_parser.add_argument("--when", "-w", default=time_filter,
-                             help="Filter by time")
+                             help="Filter by time. See TIME FORMATS in the "
+                             "top-level help string for the syntax.")
 
     # Running with no args displays the journal, same as 'j s'
     if len(sys.argv[1:]) == 0:

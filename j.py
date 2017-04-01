@@ -9,19 +9,14 @@ import io
 from datetime import datetime, timedelta
 import subprocess
 
-try:
-    JRNL_DIR = os.environ["J_JOURNAL_DIR"]
-except KeyError:
-    print("Please set J_JOURNAL_DIR")
-    sys.exit(1)
 
-DEFAULT_DATE_FILTER = os.environ.get("J_JOURNAL_DEFAULT_TIME")
-
-EDITOR = os.environ.get("EDITOR", "vi")
 TIME_FORMAT = "%Y%m%d_%H%M%S"
 
 RULE_SIZE = 78
 DOUBLE_RULE = "=" * RULE_SIZE
+
+DEFAULT_EDITOR = "vi"
+DEFAULT_PAGER = "less -R"
 
 WHEN_HELP = """Time formats for -w are of the form `[start][:[end]]`, where
 start and end are either an absolute time, or a relative time before now.
@@ -101,14 +96,6 @@ class Colours(dict):
 
     def reset(self):
         return self.reset_seq
-
-
-# XXX It would be easier to test if this stuff were not global
-COLOUR_SPEC = os.environ.get("J_JOURNAL_COLOURS", None)
-if COLOUR_SPEC:
-    COLOURS = Colours.from_str(COLOUR_SPEC)
-else:
-    COLOURS = Colours()
 
 
 class FilterSettings:
@@ -277,27 +264,30 @@ class Entry:
 
             self.body = "".join(lines)
 
-    def __str__(self):
+    def format(self, colours=None):
+        if not colours:
+            colours = Colours()  # default colours (i.e. none)
+
         time_str = str(self.time)
         pad = " " * (RULE_SIZE - len(time_str) - len(self.ident()))
         headers = [
-            "%s%s%s" % (COLOURS["rule"], DOUBLE_RULE, COLOURS.reset()),
-            "%s%s%s%s%s" % (COLOURS["meta"], time_str, pad, self.ident(),
-                            COLOURS.reset()),
-            "%s%s%s" % (COLOURS["title"], self.title.center(RULE_SIZE),
-                        COLOURS.reset()),
+            "%s%s%s" % (colours["rule"], DOUBLE_RULE, colours.reset()),
+            "%s%s%s%s%s" % (colours["meta"], time_str, pad, self.ident(),
+                            colours.reset()),
+            "%s%s%s" % (colours["title"], self.title.center(RULE_SIZE),
+                        colours.reset()),
         ]
         if self.tags:
             atted_tags = ["@%s" % x for x in self.tags]
             attr_line = " ".join(atted_tags).center(RULE_SIZE)
-            headers.append("%s%s%s" % (COLOURS["attrs"], attr_line,
-                                       COLOURS.reset()))
+            headers.append("%s%s%s" % (colours["attrs"], attr_line,
+                                       colours.reset()))
         rec = "\n".join(headers)
         if self.body:
             # ANSI colours reset at EOL, so we have to mark up each line
             rec += "\n\n"
             for line in self.body.splitlines():
-                rec += ("%s%s%s\n" % (COLOURS["body"], line, COLOURS.reset()))
+                rec += ("%s%s%s\n" % (colours["body"], line, colours.reset()))
         return rec
 
     def matches_tag(self, tag):
@@ -309,9 +299,23 @@ class Entry:
 
 
 class Journal:
-    def __init__(self, directory, pager="less -R"):
+    def __init__(self, directory, colours=None, editor=DEFAULT_EDITOR,
+                 pager=DEFAULT_PAGER):
+        """Makes a journal instance.
+
+        Args:
+          directory (str): path to journal storage directory
+          colours (Colours): A Colours instance or None.
+          pager (str): Pager command and args or None.
+        """
+
         self.directory = directory
+        self.colours = colours
+        self.editor = editor
         self.pager = pager
+        if not colours:
+            colours = Colours()
+        self.colours = colours
 
         if not os.path.exists(self.directory):
             logging.debug("creating '%s'" % self.directory)
@@ -397,7 +401,7 @@ class Journal:
 
         of = io.StringIO()
         for e in entries:
-            of.write(str(e) + "\n")
+            of.write(e.format(self.colours) + "\n")
 
         if self.pager:
             p = subprocess.Popen(self.pager, shell=True, stdin=subprocess.PIPE)
@@ -424,7 +428,7 @@ class Journal:
     def _invoke_editor(self, paths):
         cached_paths = paths[:]  # below code mutates 'paths'
         while True:
-            args = [EDITOR] + paths
+            args = [self.editor] + paths
             subprocess.check_call(args)
 
             problem_paths = {}
@@ -455,11 +459,28 @@ class Journal:
 
 
 if __name__ == "__main__":
+    # Handle all environment variables here
     if os.environ.get("J_JOURNAL_DEBUG"):
         logging.root.setLevel(logging.DEBUG)
 
-    jrnl = Journal(JRNL_DIR)
+    colour_env = os.environ.get("J_JOURNAL_COLOURS", None)
+    if colour_env:
+        colours = Colours.from_str(colour_env)
+    else:
+        colours = Colours()
 
+    try:
+        jrnl_dir = os.environ["J_JOURNAL_DIR"]
+    except KeyError:
+        print("Please set J_JOURNAL_DIR")
+        sys.exit(1)
+
+    date_filter = os.environ.get("J_JOURNAL_DEFAULT_TIME")
+    editor = os.environ.get("EDITOR", DEFAULT_EDITOR)
+
+    jrnl = Journal(jrnl_dir, colours, editor)
+
+    # Command line interface
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
 
@@ -479,7 +500,7 @@ if __name__ == "__main__":
                              help="omit bodies")
     show_parser.add_argument("--term", "-t", nargs="*", default=None,
                              help="Filter by search terms")
-    show_parser.add_argument("--when", "-w", default=DEFAULT_DATE_FILTER,
+    show_parser.add_argument("--when", "-w", default=date_filter,
                              help="Filter by time")
 
     # Running with no args displays the journal, same as 'j s'

@@ -179,6 +179,11 @@ class TimeFilter:
         self.start = start
         self.stop = stop
 
+    @staticmethod
+    def now():
+        # separate for testing with monkeypatch
+        return datetime.now()
+
     @classmethod
     def from_arg(cls, arg):
         elems = arg.split(":")
@@ -229,7 +234,7 @@ class TimeFilter:
             else:
                 assert False  # unreachable
 
-            return datetime.now() - delta
+            return TimeFilter.now() - delta
         else:
             for fmt in TimeFilter.ABS_TIME_FMTS:
                 try:
@@ -246,7 +251,7 @@ class TimeFilter:
             return True
 
         if not self.stop:
-            stop = datetime.now()
+            stop = TimeFilter.now()
         else:
             stop = self.stop
 
@@ -300,7 +305,7 @@ class Entry:
                 # We only support tags here for now
                 for attr in attrs:
                     if not attr.startswith("@"):
-                        raise ParseError("unknown attribue %s" % attr)
+                        raise ParseError("unknown attribute %s" % attr)
                 self.tags = set([x[1:] for x in attrs])
 
                 # Now expect a blank line or EOF
@@ -380,38 +385,11 @@ class Journal:
         logging.debug("journal directory is '%s'" % self.directory)
 
     def _new_entry_create(self, **contents):
-        """Create a new file for a new entry.
+        """Create a new file for a new entry."""
 
-        Contents, if passed, is a dict with at least the key "title", and
-        optionally "attrs" and "body". Each value in the dict is a string for
-        each line (or for multiple lines in the case of body). This is used in
-        testing to pre-populate the entry, since testing the interactive
-        section of `invoke_editor` would be awkward.
-
-        Under normal circumstances this function just makes a blank file.
-        """
-
-        now = datetime.now()
+        now = TimeFilter.now()
         prefix = now.strftime("%s-" % TIME_FORMAT)
         fd, path = tempfile.mkstemp(prefix=prefix)
-
-        if contents:
-            # This is strictly for tests only.
-            # XXX ideally I think we should move this into the test suite.
-            assert "title" in contents.keys()
-            os.write(fd, (contents["title"] + "\n").encode(
-                sys.getdefaultencoding()))
-
-            if "attrs" in contents.keys():
-                os.write(fd, (contents["attrs"] + "\n").encode(
-                    sys.getdefaultencoding()))
-
-            if "body" in contents.keys():
-                os.write(fd, ("\n" + contents["body"]).encode(
-                    sys.getdefaultencoding()))
-
-            self._move_entry_in(path, False)
-
         os.close(fd)
         return path
 

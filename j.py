@@ -457,7 +457,7 @@ class Journal:
         for e in entries:
             of.write(e.format(self.colours) + "\n")
 
-        if self.pager:
+        if self.pager and sys.stdout.isatty():
             p = subprocess.Popen(self.pager, shell=True, stdin=subprocess.PIPE)
             sout, serr = p.communicate(
                 of.getvalue().encode(sys.getdefaultencoding()))

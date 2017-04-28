@@ -352,9 +352,9 @@ class Entry:
     def matches_tag(self, tag):
         return tag in self.tags
 
-    def matches_term(self, term):
+    def matches_text(self, text):
         with open(self.path) as fh:
-            return term in fh.read()
+            return text in fh.read()
 
     def matches_ids(self, ids):
         return os.path.basename(self.path) in ids
@@ -433,7 +433,7 @@ class Journal:
 
                 # Only add if *all* textual filters match
                 if filters.textual_filters:
-                    matches = [entry.matches_term(t) for t in
+                    matches = [entry.matches_text(t) for t in
                                filters.textual_filters]
                     if not all(matches):
                         continue
@@ -576,7 +576,7 @@ if __name__ == "__main__":
     show_parser.add_argument("--short", "-s", action="store_true",
                              help="omit entry bodies.")
     show_parser.add_argument("--term", "-t", action="append", default=None,
-                             help="Filter by search terms.")
+                             help="Filter by textual search terms.")
     show_parser.add_argument("--when", "-w", default=time_filter,
                              help="Filter by time. See TIME FORMATS in the "
                              "top-level help string for the syntax.")

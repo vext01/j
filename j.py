@@ -82,6 +82,13 @@ are available:
 """ % (DEFAULT_EDITOR, DEFAULT_PAGER)
 
 
+def print_err(msg, newline=True):
+    sys.stderr.write(msg)
+    if newline:
+        sys.stderr.write("\n")
+    sys.stderr.flush()
+
+
 class Colours(dict):
     # ANSI colour sequences for:
     KEYS = [
@@ -544,7 +551,7 @@ if __name__ == "__main__":
     try:
         jrnl_dir = os.environ["J_JOURNAL_DIR"]
     except KeyError:
-        print("Please set J_JOURNAL_DIR")
+        print_err("Please set J_JOURNAL_DIR")
         sys.exit(1)
 
     time_filter = os.environ.get("J_JOURNAL_TIME")

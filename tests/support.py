@@ -5,10 +5,12 @@ import tempfile
 import pytest
 import shutil
 import datetime
+import subprocess
 
 TEST_DIR = os.path.dirname(__file__)
 PARENT_DIR = os.path.abspath(os.path.join(TEST_DIR, ".."))
 sys.path.insert(0, PARENT_DIR)
+J_SCRIPT = os.path.join(PARENT_DIR, "j.py")
 
 import j  # noqa: E402
 
@@ -39,7 +41,8 @@ def insert_entry(jrnl, title, attrs=None, body=None, time=None,
         fd, path = tempfile.mkstemp(prefix=prefix, dir=jrnl.directory)
     else:
         path = "%s%s" % (prefix, fn_suffix)
-        fd = os.open(path, os.O_CREAT)
+        path = os.path.join(jrnl.directory, path)
+        fd = os.open(path, os.O_CREAT | os.O_WRONLY)
 
     # Populate the file
     os.write(fd, (title + "\n").encode(sys.getdefaultencoding()))
@@ -63,3 +66,20 @@ def freeze_time(monkeypatch):
     def fake_datetime_now():
         return now
     monkeypatch.setattr(j.TimeFilter, "now",  fake_datetime_now)
+
+
+def run_j(jrnl, args):
+    if jrnl:
+        env = {"J_JOURNAL_DIR": jrnl.directory}
+    else:
+        env = {}
+
+    args = [J_SCRIPT] + args
+    p = subprocess.Popen(
+        args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+    )
+    sout, serr = p.communicate()
+    return sout, serr, p.returncode

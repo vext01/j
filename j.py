@@ -161,9 +161,10 @@ class Colours(dict):
 
 class FilterSettings:
     def __init__(self, tag_filters=None, textual_filters=None,
-                 time_filter=None, id_filters=None):
+                 time_filter=None, id_filters=None, case_sensitive=False):
         self.tag_filters = tag_filters
         self.textual_filters = textual_filters
+        self.case_sensitive = case_sensitive
         self.time_filter = time_filter
         self.id_filters = id_filters
 
@@ -371,9 +372,13 @@ class Entry:
     def matches_tag(self, tag):
         return tag in self.tags
 
-    def matches_text(self, text):
+    def matches_text(self, text, case_sensitive=False):
         with open(self.path) as fh:
-            return text in fh.read()
+            contents = fh.read()
+            if not case_sensitive:
+                contents = contents.lower()
+                text = text.lower()
+            return text in contents
 
     def matches_ids(self, ids):
         return os.path.basename(self.path) in ids
@@ -452,8 +457,10 @@ class Journal:
 
                 # Only add if *all* textual filters match
                 if filters.textual_filters:
-                    matches = [entry.matches_text(t) for t in
-                               filters.textual_filters]
+                    matches = [
+                        entry.matches_text(
+                            t, case_sensitive=filters.case_sensitive)
+                        for t in filters.textual_filters]
                     if not all(matches):
                         continue
 
@@ -605,6 +612,8 @@ if __name__ == "__main__":
                              "top-level help string for the syntax.")
     show_parser.add_argument("--json", "-j", action="store_true",
                              help="Output in JSON format")
+    show_parser.add_argument("--case-sensitive", "-c", action="store_true",
+                             help="Make textual filters case sensitive")
 
     # Running with no args displays the journal, same as 'j s'
     if len(sys.argv[1:]) == 0:
@@ -648,6 +657,7 @@ if __name__ == "__main__":
             textual_filters=textual_filters,
             time_filter=time_filter,
             id_filters=id_filters,
+            case_sensitive=args.case_sensitive,
         )
         jrnl.show_entries(bodies=not args.short, filters=filters,
                           output_json=args.json)

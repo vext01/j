@@ -57,6 +57,7 @@ def test_show_entries0002(jrnl):  # noqa: F811
     assert rv == 0
     assert err.strip() == b""
     jsn = json.loads(out.strip())
+    assert len(jsn["entries"]) == 1
     ent = jsn["entries"][0]
 
     assert ent["title"] == "My Title"

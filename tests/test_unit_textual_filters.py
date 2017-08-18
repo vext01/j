@@ -48,8 +48,18 @@ def test_textual_filter_0003(jrnl, filters):  # noqa: F811
 
 
 def test_textual_filter_0004(jrnl, filters):  # noqa: F811
-    """Check search is case sensitive"""
+    """Check textual search is not case sensitive by default"""
 
+    insert_entry(jrnl, title="About the BBQ", body="Toxic BBQ")
+    filters.textual_filters = ["toxic"]
+    ents = jrnl._collect_entries(filters)
+    assert len(ents) == 1
+
+
+def test_textual_filter_0005(jrnl, filters):  # noqa: F811
+    """Check case sensitive textual search"""
+
+    filters.case_sensitive = True
     insert_entry(jrnl, title="About the BBQ", body="Toxic BBQ")
     filters.textual_filters = ["toxic"]
     ents = jrnl._collect_entries(filters)

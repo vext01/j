@@ -1,6 +1,7 @@
 from support import jrnl  # noqa: F401
 from support import insert_entry, run_j
 import datetime
+import json
 
 
 def test_no_journal_path_env0001():
@@ -20,7 +21,7 @@ def test_no_args0001(jrnl):  # noqa: F811
 
 
 def test_show_entries0001(jrnl):  # noqa: F811
-    """Check normal output works (non JSON)"""
+    """Check normal output works"""
 
     dt = datetime.datetime(2017, 1, 1, 12, 00, 00)
     insert_entry(jrnl, "My Title", "@tag1 @tag2", "Body", time=dt,
@@ -44,3 +45,20 @@ def test_show_entries0001(jrnl):  # noqa: F811
         lines[3].strip() == b'@tag2 @tag1'
     assert lines[4] == b''
     assert lines[5] == b'Body'
+
+
+def test_show_entries0002(jrnl):  # noqa: F811
+    """Check normal output works"""
+
+    dt = datetime.datetime(2017, 1, 1, 12, 00, 00)
+    insert_entry(jrnl, "My Title", "@tag1 @tag2", "Body", time=dt,
+                 fn_suffix="xxxxxxxx")
+    out, err, rv = run_j(jrnl, ["s", "-j"])
+    assert rv == 0
+    assert err.strip() == b""
+    jsn = json.loads(out.strip())
+    ent = jsn["entries"][0]
+
+    assert ent["title"] == "My Title"
+    assert ent["time"] == "2017-01-01 12:00:00"
+    assert set(ent["tags"]) == set(["tag1", "tag2"])

@@ -6,6 +6,7 @@ import os
 import tempfile
 import argparse
 import io
+import json
 from datetime import datetime, timedelta
 import subprocess
 import shutil
@@ -356,6 +357,17 @@ class Entry:
                 rec += ("%s%s%s\n" % (colours["body"], line, colours.reset()))
         return rec
 
+    def as_dict(self):
+        """Return the entries attributes as a dict (used for JSON encoding)"""
+
+        return {
+            "path": self.path,
+            "title": self.title,
+            "time": str(self.time),
+            "body": self.body,
+            "tags": list(self.tags),
+        }
+
     def matches_tag(self, tag):
         return tag in self.tags
 
@@ -454,15 +466,19 @@ class Journal:
                 entries.append(entry)
         return sorted(entries, key=lambda e: e.time, reverse=True)
 
-    def show_entries(self, filters=None, bodies=True):
+    def show_entries(self, filters=None, bodies=True, output_json=False):
         if not filters:
             filters = FilterSettings()
 
         entries = self._collect_entries(bodies=bodies, filters=filters)
 
         of = io.StringIO()
-        for e in entries:
-            of.write(e.format(self.colours) + "\n")
+        if not output_json:
+            for e in entries:
+                of.write(e.format(self.colours) + "\n")
+        else:
+            dcts = [e.as_dict() for e in entries]
+            of.write(json.dumps({"entries": dcts}, indent=2))
 
         if self.pager and sys.stdout.isatty():
             p = subprocess.Popen(self.pager, shell=True, stdin=subprocess.PIPE)
@@ -587,6 +603,8 @@ if __name__ == "__main__":
     show_parser.add_argument("--when", "-w", default=time_filter,
                              help="Filter by time. See TIME FORMATS in the "
                              "top-level help string for the syntax.")
+    show_parser.add_argument("--json", "-j", action="store_true",
+                             help="Output in JSON format")
 
     # Running with no args displays the journal, same as 'j s'
     if len(sys.argv[1:]) == 0:
@@ -631,7 +649,8 @@ if __name__ == "__main__":
             time_filter=time_filter,
             id_filters=id_filters,
         )
-        jrnl.show_entries(bodies=not args.short, filters=filters)
+        jrnl.show_entries(bodies=not args.short, filters=filters,
+                          output_json=args.json)
     elif mode == "edit":
         if len(args.arg) != 1:
             edit_parser.print_help()

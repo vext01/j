@@ -506,6 +506,9 @@ class Journal:
           entries (list of str): list of existing entries to edit
         """
 
+        if len(entries) == 0:
+            return
+
         tmp_paths = []
         for ent in entries:
             path = ent.path

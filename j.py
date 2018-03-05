@@ -281,6 +281,7 @@ class Entry:
         self.time = None
         self.body = None
         self.tags = set()
+        self.sticky = False
         self.parse(meta_only)
 
     def ident(self):
@@ -311,11 +312,13 @@ class Entry:
 
             if attr_line != "":
                 attrs = attr_line.split(" ")
-                # We only support tags here for now
                 for attr in attrs:
-                    if not attr.startswith("@"):
+                    if attr.startswith("@"):
+                        self.tags.add(attr[1:])
+                    elif attr == "sticky":
+                        self.sticky = True
+                    else:
                         raise ParseError("unknown attribute %s" % attr)
-                self.tags = set([x[1:] for x in attrs])
 
                 # Now expect a blank line or EOF
                 try:
@@ -444,7 +447,7 @@ class Journal:
                 # Only add if the time filter matches
                 # XXX invert the relationship between the filter an the entry
                 # like the other filters XXX.
-                if filters.time_filter:
+                if not entry.sticky and filters.time_filter:
                     if not filters.time_filter.matches(entry):
                         continue
 

@@ -22,7 +22,25 @@ DEFAULT_PAGER = "less -R"
 
 TMP = tempfile.gettempdir()
 
-HELP_EPILOG = """TIME FORMATS
+HELP_EPILOG = """ENTRY FORMAT
+------------
+
+Each journal entry is a plain text file with a special header.
+
+The first line of an entry is the title of the entry.
+
+An optional second line can be used to specify a list of space-separated
+"attributes" of the entry. Valid attributes are:
+
+ * 'sticky' -- The entry always passes the time filter.
+ * Any string starting with '@' -- Adds a "tag" to the post. Multiple tags
+   may be specified.
+
+After the title line and the optional attribute line, a blank line must appear,
+then the remainder of the file is the "body" of the entry. The body is
+free-form.
+
+TIME FORMATS
 ------------
 
 Time formats are of the form:
@@ -42,6 +60,7 @@ before now. If `start` is omitted, then the start time is the distant past. If
 `end` is omitted, then the end time is the distant future.
 
 CONFIGURATION
+-------------
 
 All configuration is done via environment variables. The following variables
 are available:

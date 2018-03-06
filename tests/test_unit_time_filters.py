@@ -99,11 +99,13 @@ def test_time_filter0008(jrnl, now):  # noqa: F811
 
 
 def test_time_filter0009(jrnl, now):  # noqa: F811
-    """Checks that a sticky entry unconditionally passes the time filter"""
+    """Checks that a immortal entry unconditionally passes the time filter"""
 
     tstr = (now - timedelta(days=2)).strftime("%Y-%m-%d")
     filters = FilterSettings(time_filter=TimeFilter.from_arg(tstr))
-    path = insert_entry(jrnl, title="old_sticky", time=now - timedelta(days=500 * 365), attrs="sticky")
+    path = insert_entry(jrnl, title="old_immortal",
+                        time=now - timedelta(days=500 * 365),
+                        attrs="immortal")
 
     ents = jrnl._collect_entries(filters)
     assert len(ents) == 1

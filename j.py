@@ -32,7 +32,7 @@ The first line of an entry is the title of the entry.
 An optional second line can be used to specify a list of space-separated
 "attributes" of the entry. Valid attributes are:
 
- * 'sticky' -- The entry always passes the time filter.
+ * 'immortal' -- The entry always passes the time filter.
  * Any string starting with '@' -- Adds a "tag" to the post. Multiple tags
    may be specified.
 
@@ -300,7 +300,7 @@ class Entry:
         self.time = None
         self.body = None
         self.tags = set()
-        self.sticky = False
+        self.immortal = False
         self.parse(meta_only)
 
     def ident(self):
@@ -334,8 +334,8 @@ class Entry:
                 for attr in attrs:
                     if attr.startswith("@"):
                         self.tags.add(attr[1:])
-                    elif attr == "sticky":
-                        self.sticky = True
+                    elif attr == "immortal":
+                        self.immortal = True
                     else:
                         raise ParseError("unknown attribute %s" % attr)
 
@@ -466,7 +466,7 @@ class Journal:
                 # Only add if the time filter matches
                 # XXX invert the relationship between the filter an the entry
                 # like the other filters XXX.
-                if not entry.sticky and filters.time_filter:
+                if not entry.immortal and filters.time_filter:
                     if not filters.time_filter.matches(entry):
                         continue
 

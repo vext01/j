@@ -500,6 +500,8 @@ class Journal:
             filters = FilterSettings()
 
         entries = self._collect_entries(bodies=bodies, filters=filters)
+        if len(entries) == 0:
+            return
 
         of = io.StringIO()
         if not output_json:

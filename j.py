@@ -460,7 +460,13 @@ class Journal:
 
         entries = []
         for fl in files:
-                entry = Entry(os.path.join(self.directory, fl.name),
+                fname = fl.name
+
+                # Skip dotfiles (that may be to do with file synchronisers)
+                if fname.startswith("."):
+                    continue
+
+                entry = Entry(os.path.join(self.directory, fname),
                               meta_only=not bodies)
 
                 # Only add if the time filter matches

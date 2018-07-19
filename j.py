@@ -506,8 +506,6 @@ class Journal:
             filters = FilterSettings()
 
         entries = self._collect_entries(bodies=bodies, filters=filters)
-        if len(entries) == 0:
-            return
 
         of = io.StringIO()
         if not output_json:
@@ -517,7 +515,7 @@ class Journal:
             dcts = [e.as_dict() for e in entries]
             of.write(json.dumps({"entries": dcts}, indent=2))
 
-        if self.pager and sys.stdout.isatty():
+        if entries and self.pager and sys.stdout.isatty():
             p = subprocess.Popen(self.pager, shell=True, stdin=subprocess.PIPE)
             sout, serr = p.communicate(
                 of.getvalue().encode(sys.getdefaultencoding()))

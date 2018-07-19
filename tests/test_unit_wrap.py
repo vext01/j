@@ -32,6 +32,16 @@ Paragraph in the middle.
 after1
 after2, and the end"""
 
+TRIPLE_INPUT1 = """start
+
+```
+123
+456
+789
+```
+
+end"""
+
 
 def test_basic_wrap0001():
     input = "This is a test. " * 100
@@ -69,3 +79,8 @@ def test_urls_preserved0001():
     for i in range(10, 100):
         input = "http://{0}\nhttps://{0}".format(silly_hostname)
         assert "\n".join(wrap(input, i)) == input
+
+
+def test_wrap_preserved0001():
+    for i in range(10, 100):
+        assert "\n".join(wrap(TRIPLE_INPUT1, i)) == TRIPLE_INPUT1

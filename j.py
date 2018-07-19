@@ -622,13 +622,19 @@ def wrap(input, col):
 
     para_lines = []  # Buffer up lines to be wrapped here
     out_lines = []   # Completed wrapped lines eventually go here
+    in_triples = False
     in_list = False
 
     for line in input.splitlines():
-        if line.strip().startswith(("-", "*", "http://", "https://")):
+        stripped_line = line.strip()
+        if in_triples or stripped_line.startswith(("-", "*", "http://", "https://")):
             # Special line which is not wrapped
             out_lines.append(line)
             in_list = True
+        elif stripped_line.startswith("```"):
+            # Enter/exit a triple quoted block.
+            out_lines.append(line)
+            in_triples = not in_triples
         elif not line.strip():
             # An empty line marks the ends of a paragraphs and bullet lists
             out_lines.extend(textwrap.wrap("\n".join(para_lines), col) + [""])

@@ -7,6 +7,7 @@ import tempfile
 import argparse
 import io
 import json
+import textwrap
 from datetime import datetime, timedelta
 import subprocess
 import shutil
@@ -14,11 +15,9 @@ import shutil
 
 TIME_FORMAT = "%Y%m%d_%H%M%S"
 
-RULE_SIZE = 78
-DOUBLE_RULE = "=" * RULE_SIZE
-
 DEFAULT_EDITOR = "vi"
 DEFAULT_PAGER = "less -R"
+DEFAULT_WRAP_COL = 78
 
 TMP = tempfile.gettempdir()
 
@@ -33,12 +32,16 @@ An optional second line can be used to specify a list of space-separated
 "attributes" of the entry. Valid attributes are:
 
  * 'immortal' -- The entry always passes the time filter.
+ * 'nowrap' -- Do not wrap the paragraphs in this entry.
  * Any string starting with '@' -- Adds a "tag" to the post. Multiple tags
    may be specified.
 
 After the title line and the optional attribute line, a blank line must appear,
 then the remainder of the file is the "body" of the entry. The body is
-free-form.
+free-form. When displayed, the body of entries is wrapped to enable readability
+on small screens (e.g. on a phone). Lines (once stripped) that begin with '-',
+'*', 'http://' or 'https://' will not be wrapped. The wrapping extent is
+configured with the J_JOURNAL_WRAP_COL environment detailed below.
 
 TIME FORMATS
 ------------
@@ -92,6 +95,12 @@ are available:
     J_JOURNAL_TIME
         The default time filter. See TIME FORMATS for syntax.
 
+    J_JOURNAL_WRAP_COL
+        Change the column at which entries are wrapped. If negative, turns off
+        wrapping for the entry body and the absolute value is used as the width
+        of the entry headers and separating rules. The default value is %s. See
+        also the 'nowrap' entry attribute.
+
     EDITOR
         The editor command to use to edit journal entries. It must support
         multiple file names on the command line. If unset, defaults to '%s'.
@@ -99,7 +108,7 @@ are available:
     PAGER
         The pager command used to scroll entries. If unset, defaults to
         '%s'.
-""" % (DEFAULT_EDITOR, DEFAULT_PAGER)
+""" % (DEFAULT_WRAP_COL, DEFAULT_EDITOR, DEFAULT_PAGER)
 
 
 def print_err(msg, newline=True):
@@ -301,6 +310,7 @@ class Entry:
         self.body = None
         self.tags = set()
         self.immortal = False
+        self.wrap = True
         self.parse(meta_only)
 
     def ident(self):
@@ -336,6 +346,8 @@ class Entry:
                         self.tags.add(attr[1:])
                     elif attr == "immortal":
                         self.immortal = True
+                    elif attr == "nowrap":
+                        self.wrap = False
                     else:
                         raise ParseError("unknown attribute %s" % attr)
 
@@ -354,29 +366,33 @@ class Entry:
 
             self.body = "".join(lines)
 
-    def format(self, colours=None):
+    def format(self, wrap_col, colours=None):
         if not colours:
             colours = Colours()  # default colours (i.e. none)
 
+        header_wrap = abs(wrap_col)
         time_str = str(self.time)
-        pad = " " * (RULE_SIZE - len(time_str) - len(self.ident()))
+        pad = " " * (header_wrap - len(time_str) - len(self.ident()))
+        rule = header_wrap * "="
         headers = [
-            "%s%s%s" % (colours["rule"], DOUBLE_RULE, colours.reset()),
+            "%s%s%s" % (colours["rule"], rule, colours.reset()),
             "%s%s%s%s%s" % (colours["meta"], time_str, pad, self.ident(),
                             colours.reset()),
-            "%s%s%s" % (colours["title"], self.title.center(RULE_SIZE),
+            "%s%s%s" % (colours["title"], self.title.center(header_wrap),
                         colours.reset()),
         ]
         if self.tags:
             atted_tags = ["@%s" % x for x in self.tags]
-            attr_line = " ".join(atted_tags).center(RULE_SIZE)
+            attr_line = " ".join(atted_tags).center(header_wrap)
             headers.append("%s%s%s" % (colours["attrs"], attr_line,
                                        colours.reset()))
         rec = "\n".join(headers)
         if self.body:
             # ANSI colours reset at EOL, so we have to mark up each line
             rec += "\n\n"
-            for line in self.body.splitlines():
+            if not self.wrap:
+                wrap_col = -1
+            for line in wrap(self.body, wrap_col):
                 rec += ("%s%s%s\n" % (colours["body"], line, colours.reset()))
         return rec
 
@@ -408,7 +424,7 @@ class Entry:
 
 class Journal:
     def __init__(self, directory, colours=None, editor=DEFAULT_EDITOR,
-                 pager=DEFAULT_PAGER):
+                 pager=DEFAULT_PAGER, wrap_col=DEFAULT_WRAP_COL):
         """Makes a journal instance.
 
         Args:
@@ -424,6 +440,7 @@ class Journal:
         if not colours:
             colours = Colours()
         self.colours = colours
+        self.wrap_col = wrap_col
 
         if not os.path.exists(self.directory):
             logging.debug("creating '%s'" % self.directory)
@@ -510,7 +527,7 @@ class Journal:
         of = io.StringIO()
         if not output_json:
             for e in entries:
-                of.write(e.format(self.colours) + "\n")
+                of.write(e.format(self.wrap_col, self.colours) + "\n")
         else:
             dcts = [e.as_dict() for e in entries]
             of.write(json.dumps({"entries": dcts}, indent=2))
@@ -591,6 +608,42 @@ class Journal:
                 return
 
 
+def wrap(input, col):
+    """
+    Wrap paragraphs up to column number `col`, whilst preserving bullet lists.
+
+    Returns a list of lines.
+
+    If `col` is negative, don't wrap the lines at all.
+    """
+
+    if col < 0:
+        return input.splitlines()
+
+    para_lines = []  # Buffer up lines to be wrapped here
+    out_lines = []   # Completed wrapped lines eventually go here
+    in_list = False
+
+    for line in input.splitlines():
+        if line.strip().startswith(("-", "*", "http://", "https://")):
+            # Special line which is not wrapped
+            out_lines.append(line)
+            in_list = True
+        elif not line.strip():
+            # An empty line marks the ends of a paragraphs and bullet lists
+            out_lines.extend(textwrap.wrap("\n".join(para_lines), col) + [""])
+            para_lines = []
+            in_list = False
+        elif in_list:
+            # If we are still in a list then pass the line right through
+            out_lines.append(line)
+        else:
+            # Otherwise buffer the line for wrapping
+            para_lines.append(line)
+    out_lines.extend(textwrap.wrap("\n".join(para_lines), col))
+    return out_lines
+
+
 if __name__ == "__main__":
     # Handle all environment variables here
     if os.environ.get("J_JOURNAL_DEBUG"):
@@ -608,12 +661,19 @@ if __name__ == "__main__":
         print_err("Please set J_JOURNAL_DIR")
         sys.exit(1)
 
+    wrap_col = os.environ.get("J_JOURNAL_WRAP_COL", DEFAULT_WRAP_COL)
+    try:
+        wrap_col = int(wrap_col)
+    except ValueError:
+        print_err("Invalid J_JOURNAL_WRAP_COL environment")
+        sys.exit(1)
     time_filter = os.environ.get("J_JOURNAL_TIME")
     editor = os.environ.get("EDITOR", DEFAULT_EDITOR)
     pager = os.environ.get("J_JOURNAL_PAGER", DEFAULT_PAGER)
     # XXX make rule configurable.
 
-    jrnl = Journal(jrnl_dir, colours=colours, editor=editor, pager=pager)
+    jrnl = Journal(jrnl_dir, colours=colours, editor=editor, pager=pager,
+                   wrap_col=wrap_col)
 
     # Command line interface
     parser = argparse.ArgumentParser(

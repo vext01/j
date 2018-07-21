@@ -81,6 +81,6 @@ def test_urls_preserved0001():
         assert "\n".join(wrap(input, i)) == input
 
 
-def test_wrap_preserved0001():
+def test_triple_backticks0001():
     for i in range(10, 100):
         assert "\n".join(wrap(TRIPLE_INPUT1, i)) == TRIPLE_INPUT1

@@ -46,7 +46,7 @@ The body is then interpreted as a markdown-like language:
  * Markdown-style lists are supported.
  * Lines that begin with `http://` or `https://` will not be wrapped.
  * Triple backtick lines toggle wrapping on and off (for code samples).
- * Markdown-style headers are supported.
+ * Markdown-style hash headers are supported, but underline ones are not.
 
 TIME FORMATS
 ------------
@@ -398,7 +398,7 @@ class Entry:
             if not self.wrap:
                 wrap_col = -1
 
-            for line in wrap(self.body, wrap_col):
+            for line in format_body(self.body, wrap_col):
                 rec += ("%s%s%s\n" % (colours["body"], line, colours.reset()))
         return rec
 
@@ -631,10 +631,10 @@ def is_a_header_rule(s):
     return True
 
 
-def wrap(input, col):
+def format_body(input, col):
     """
     Wrap paragraphs up to column number `col`. A markdown-like syntax is
-    supported to alter the wrapping behaviours.
+    supported.
 
     Returns a list of lines.
 
@@ -648,55 +648,63 @@ def wrap(input, col):
     out_lines = []   # Completed wrapped lines eventually go here
     in_triples = False
     in_list = False
+    flush_on_next = False
+    newline_on_next = False
 
-    def flush_para():
-        nonlocal in_list
+    def flush_para(last_para=False):
+        nonlocal in_list, newline_on_next
+        # XXX last paragraph has a trailing newline
         if para_lines:
-            out_lines.extend(textwrap.wrap("\n".join(para_lines), col) + [""])
+            out_lines.extend(textwrap.wrap("\n".join(para_lines), col))
             del para_lines[:]
+            if not last_para:
+                out_lines.append("")
         in_list = False
 
     for line in input.splitlines():
-        rstripped_line = line.strip()
+        if flush_on_next and line:
+            flush_para()
+            flush_on_next = False
 
-        if rstripped_line == "```":
+        words = line.split()
+
+        if line == "```":
             # verbatim ``` block start/end
             if not in_triples:
                 flush_para()
-            out_lines.append(rstripped_line)
-            if in_triples:
-                out_lines.append("")
+                out_lines.append("/")
+            else:
+                out_lines.extend(["\\", ""])
             in_triples = not in_triples
         elif in_triples:
-            out_lines.append(rstripped_line)
-        elif not rstripped_line:
+            out_lines.append("| " + line)
+        elif not line.strip():
             # An empty line marks the end of a paragraphs and a bullet list
-            flush_para()
-        elif rstripped_line.startswith(("http://", "https://")):
-            # Lines starting with URLs are preserved
-            out_lines.append(line)  # the orginal line, in case we are in a list
-        elif rstripped_line.startswith("#"):
-            out_lines.append(rstripped_line)
-        elif is_a_header_rule(rstripped_line):
-            # Header rule lines
-            try:
-                prev_line = para_lines.pop()
-            except IndexError:
-                out_lines.append(rstripped_line)
+            if in_list:
+                out_lines.append("")
+                in_list = False
             else:
-                #flush_para()
-                out_lines.extend([prev_line, rstripped_line])
-        elif rstripped_line.lstrip().startswith(("-", "*")):
+                flush_on_next = True
+        elif line.startswith(("http://", "https://")):
+            # Lines starting with URLs are preserved
+            out_lines.append(line)
+        elif all([ch == "#" for ch in words[0]]):
+            # A h1/h2/...
+            flush_para()
+            out_lines.append(line)
+            out_lines.append('-' * len(line))
+            out_lines.append("")
+        elif line.lstrip().startswith(("-", "*")):
             # A bullet list item
             out_lines.append(line)  # preserve indent!
             in_list = True
         elif in_list:
             # If we are still in a list then pass the line right through
-            out_lines.append(rstripped_line)
+            out_lines.append(line)
         else:
             # Otherwise buffer the line for wrapping
-            para_lines.append(rstripped_line)
-    out_lines.extend(textwrap.wrap("\n".join(para_lines), col))
+            para_lines.append(" ".join(words))
+    flush_para(True)
     return out_lines
 
 
@@ -726,7 +734,6 @@ if __name__ == "__main__":
     time_filter = os.environ.get("J_JOURNAL_TIME")
     editor = os.environ.get("EDITOR", DEFAULT_EDITOR)
     pager = os.environ.get("J_JOURNAL_PAGER", DEFAULT_PAGER)
-    # XXX make rule configurable.
 
     jrnl = Journal(jrnl_dir, colours=colours, editor=editor, pager=pager,
                    wrap_col=wrap_col)

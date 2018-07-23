@@ -1,6 +1,6 @@
 import pytest
 import support  # noqa: F401
-from j import wrap
+from j import format_body
 import textwrap
 
 LIST_INPUT1 = """this is a test
@@ -46,19 +46,19 @@ end"""
 def test_basic_wrap0001():
     input = "This is a test. " * 100
     for i in range(10, 100):
-        assert wrap(input, i) == textwrap.wrap(input, i)
+        assert format_body(input, i) == textwrap.wrap(input, i)
 
 
 def test_preserve_list0001():
     for i in range(10, 100):
-        got = wrap(LIST_INPUT1, 80)
+        got = format_body(LIST_INPUT1, 80)
         for j in 1, 2, 3:
             assert " - item%d" % j in got
 
 
 def test_preserve_list0002():
     for i in range(10, 100):
-        got = wrap(LIST_INPUT2, 80)
+        got = format_body(LIST_INPUT2, 80)
         for j in 1, 2, 3:
             assert " * item%d" % j in got
             assert "   - sub%d" % j in got
@@ -70,7 +70,7 @@ def test_paragraphs_preserved0001():
     input = ("\n".join([para, "\n"]) * n_paras).strip()
 
     for i in range(10, 100):
-        got = wrap(input, i)
+        got = format_body(input, i)
         assert got.count("") == n_paras - 1
 
 
@@ -78,9 +78,10 @@ def test_urls_preserved0001():
     silly_hostname = "a" * 500
     for i in range(10, 100):
         input = "http://{0}\nhttps://{0}".format(silly_hostname)
-        assert "\n".join(wrap(input, i)) == input
+        assert "\n".join(format_body(input, i)) == input
 
 
 def test_triple_backticks0001():
+    expect = "start\n\n/\n| 123\n| 456\n| 789\n\\\n\nend"
     for i in range(10, 100):
-        assert "\n".join(wrap(TRIPLE_INPUT1, i)) == TRIPLE_INPUT1
+        assert "\n".join(format_body(TRIPLE_INPUT1, i)) == expect

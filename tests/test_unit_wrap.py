@@ -85,3 +85,16 @@ def test_triple_backticks0001():
     expect = "start\n\n/\n| 123\n| 456\n| 789\n\\\n\nend"
     for i in range(10, 100):
         assert "\n".join(format_body(TRIPLE_INPUT1, i)) == expect
+
+
+def test_no_trailing_newline0001():
+    input = " - list item"
+    for i in range(10, 100):
+        assert "\n".join(format_body(input, i)) == input
+
+
+def test_no_trailing_newline0002():
+    input = "```\n123\n```"
+    expect = "/\n| 123\n\\"
+    for i in range(10, 100):
+        assert "\n".join(format_body(input, i)) == expect

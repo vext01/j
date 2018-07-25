@@ -648,23 +648,22 @@ def format_body(input, col):
     out_lines = []   # Completed wrapped lines eventually go here
     in_triples = False
     in_list = False
-    flush_on_next = False
     newline_on_next = False
 
     def flush_para(last_para=False):
         nonlocal in_list, newline_on_next
-        # XXX last paragraph has a trailing newline
         if para_lines:
             out_lines.extend(textwrap.wrap("\n".join(para_lines), col))
             del para_lines[:]
             if not last_para:
                 out_lines.append("")
         in_list = False
+        newline_on_next = False
 
     for line in input.splitlines():
-        if flush_on_next and line:
-            flush_para()
-            flush_on_next = False
+        if newline_on_next:
+            out_lines.append("")
+            newline_on_next = False
 
         words = line.split()
 
@@ -674,17 +673,18 @@ def format_body(input, col):
                 flush_para()
                 out_lines.append("/")
             else:
-                out_lines.extend(["\\", ""])
+                out_lines.extend(["\\"])
+                newline_on_next = True
             in_triples = not in_triples
         elif in_triples:
             out_lines.append("| " + line)
         elif not line.strip():
             # An empty line marks the end of a paragraphs and a bullet list
             if in_list:
-                out_lines.append("")
                 in_list = False
+                newline_on_next = True
             else:
-                flush_on_next = True
+                flush_para()
         elif line.startswith(("http://", "https://")):
             # Lines starting with URLs are preserved
             out_lines.append(line)

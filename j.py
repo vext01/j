@@ -570,7 +570,12 @@ class Journal:
         self._invoke_editor(tmp_paths, existing=True)
 
     def edit_entry(self, ident):
-        path = os.path.join(self.directory, ident)
+        if ident is None:
+            # Edit the last entry.
+            entries = self._collect_entries(FilterSettings(), bodies=False)
+            path = entries[0].path
+        else:
+            path = os.path.join(self.directory, ident)
         entry = Entry(path)
         self._edit_existing_entries([entry])
 
@@ -750,7 +755,8 @@ if __name__ == "__main__":
     edit_parser = subparsers.add_parser('edit', aliases=['e'])
     edit_parser.set_defaults(mode='edit')
     edit_parser.add_argument("arg", nargs="*",
-                             help="entry id or @tag to edit.")
+                             help="entry id or @tag to edit, "
+                                  "or omit to edit the last entry")
 
     show_parser = subparsers.add_parser('show', aliases=['s'])
     show_parser.set_defaults(mode='show')
@@ -816,11 +822,9 @@ if __name__ == "__main__":
         jrnl.show_entries(bodies=not args.short, filters=filters,
                           output_json=args.json)
     elif mode == "edit":
-        if len(args.arg) != 1:
-            edit_parser.print_help()
-            sys.exit(1)
-
-        if args.arg[0].startswith("@"):
+        if len(args.arg) == 0:
+            jrnl.edit_entry(None)
+        elif args.arg[0].startswith("@"):
             jrnl.edit_tag(args.arg[0][1:])
         else:
             jrnl.edit_entry(args.arg[0])

@@ -570,25 +570,9 @@ class Journal:
         self._invoke_editor(tmp_paths, existing=True)
 
     def edit_entry(self, ident):
-        if ident.startswith("^"):
-            # Relative addressing.
-            filters = FilterSettings()
-            entries = self._collect_entries(bodies=False, filters=filters)
-
-            try:
-                idx = int(ident[1:])
-            except ValueError:
-                idx = -1
-
-            if idx < 0 or idx >= len(entries):
-                print("Invalid index")
-                sys.exit(1)
-
-            self._edit_existing_entries([entries[idx]])
-        else:
-            path = os.path.join(self.directory, ident)
-            entry = Entry(path)
-            self._edit_existing_entries([entry])
+        path = os.path.join(self.directory, ident)
+        entry = Entry(path)
+        self._edit_existing_entries([entry])
 
     def edit_tag(self, tag):
         filters = FilterSettings(tag_filters=[tag])
@@ -766,8 +750,7 @@ if __name__ == "__main__":
     edit_parser = subparsers.add_parser('edit', aliases=['e'])
     edit_parser.set_defaults(mode='edit')
     edit_parser.add_argument("arg", nargs="*",
-                             help="entry id or @tag to edit. "
-                                  "An id of '^N' edits the Nth newest entry.")
+                             help="entry id or @tag to edit.")
 
     show_parser = subparsers.add_parser('show', aliases=['s'])
     show_parser.set_defaults(mode='show')
